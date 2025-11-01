@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>YouTube Title/Description Optimizer + Predicted Analytics</title>
+<title>YouTube Analytics + Optimizer</title>
 <style>
 :root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
 body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
@@ -27,7 +27,7 @@ th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
 </head>
 <body>
 <div class="wrap">
-<h1>YouTube Trend-Based Optimizer + Predicted Analytics</h1>
+<h1>YouTube Analytics + Title/Description Optimizer</h1>
 
 <div class="card">
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -101,7 +101,6 @@ let tokenClient=null, accessToken=null, tokenExpiresAt=null, currentClientId='';
 const el=id=>document.getElementById(id);
 let selectedTitle=null, selectedDescription=null;
 
-// ---------------- HELPER MAPS ----------------
 const trafficSourceMap = {
   YT_SEARCH: 'YouTube Search',
   YT_WATCH: 'Suggested / Recommended',
@@ -119,7 +118,7 @@ const countryMap = {
   DE: 'Germany', FR: 'France', BR: 'Brazil', JP: 'Japan', RU: 'Russia', CN: 'China'
 };
 
-// ---------------- AUTH ----------------
+// ---------------- OAuth ----------------
 el('authBtn').addEventListener('click',()=>{
   currentClientId=el('clientId').value.trim();
   if(!currentClientId||currentClientId.startsWith('ENTER_')){alert('Enter OAuth Client ID');return;}
@@ -154,7 +153,6 @@ function initTokenClient(clientId){
   });
 }
 
-// restore token on load
 (function restoreToken(){
   try{
     const saved = JSON.parse(localStorage.getItem('yt_aud_token')||'null');
@@ -165,7 +163,6 @@ function initTokenClient(clientId){
   }catch(e){}
 })();
 
-// ---------------- UTIL ----------------
 function extractVideoId(input){if(!input) return null;input=input.trim();const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;const m=input.match(re);if(m) return m[1];if(/^[A-Za-z0-9_-]{11}$/.test(input)) return input;return null;}
 function fetchWithAuth(url){return fetch(url,{headers:{Authorization:'Bearer '+accessToken}});}
 function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -180,132 +177,75 @@ el('analyzeBtn').addEventListener('click',async()=>{
   if(!vid){el('warnings').textContent='Invalid video ID';return;} if(!accessToken){el('warnings').textContent='No access token';return;}
 
   try{
+    // Metadata
     const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${vid}`;
     const metaResp=await fetchWithAuth(videoUrl); if(!metaResp.ok) throw new Error('videos.list failed: '+metaResp.status);
     const metaJson = await metaResp.json(); if(!metaJson.items || metaJson.items.length===0){el('warnings').textContent='Video not found';return;}
     const item=metaJson.items[0];
 
+    // Analytics - separate requests to avoid unsupported query
     const end=new Date(), start=new Date(); start.setDate(end.getDate()-90);
     const startStr=start.toISOString().slice(0,10), endStr=end.toISOString().slice(0,10);
 
-    // ---------------- FIXED ANALYTICS ----------------
-    const metrics = encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage');
-    const dimensions = encodeURIComponent('insightTrafficSourceType,country');
-    const filters = encodeURIComponent(`video==${vid}`);
-    const ids = encodeURIComponent('channel==MINE');
-    const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=${dimensions}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
-    const analyticsResp = await fetchWithAuth(analyticsUrl);
-    const analyticsJson = analyticsResp.ok ? await analyticsResp.json() : { error: await analyticsResp.text() };
+    // Traffic sources per video
+    const metricsTS = 'views';
+    const dimensionsTS = 'insightTrafficSourceType';
+    const filtersTS = `video==${vid}`;
+    const ids = 'channel==MINE';
+    const tsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsTS}&dimensions=${dimensionsTS}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersTS}`;
+    const tsResp = await fetchWithAuth(tsUrl); const tsJson = tsResp.ok ? await tsResp.json() : { error: await tsResp.text() };
 
-    renderResults(item, analyticsJson, {startDate:startStr,endDate:endStr});
-    const suggestions = await generateTrendBasedSuggestions(item.snippet.title);
-    renderSuggestions(suggestions);
-    el('raw').textContent=JSON.stringify({meta:metaJson,analytics:analyticsJson},null,2);
+    // Country stats per video
+    const metricsC = 'views';
+    const dimensionsC = 'country';
+    const filtersC = `video==${vid}`;
+    const cUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersC}`;
+    const cResp = await fetchWithAuth(cUrl); const cJson = cResp.ok ? await cResp.json() : { error: await cResp.text() };
 
-  }catch(err){console.error(err); el('warnings').textContent='Error: '+(err.message||err);}
+    renderResults(item, tsJson, cJson, {startDate:startStr,endDate:endStr});
+    el('raw').textContent=JSON.stringify({meta:metaJson,trafficSources:tsJson,countries:cJson},null,2);
+  }catch(err){console.error(err);el('warnings').textContent='Error: '+(err.message||err);}
 });
 
-el('clearBtn').addEventListener('click',()=>{
-  el('videoInput').value=''; el('results').style.display='none'; el('warnings').textContent=''; el('raw').textContent='';
-  el('titles').innerHTML=''; el('descriptions').innerHTML=''; el('prediction').innerHTML='';
-  selectedTitle=null; selectedDescription=null;
-});
-
-// ---------------- RENDER RESULTS ----------------
-function renderResults(metaItem,analyticsJson,meta){
+// ---------------- RENDER ----------------
+function renderResults(metaItem,tsJson,cJson,meta){
   el('results').style.display='block';
-  const snip=metaItem.snippet||{}, stats=metaItem.statistics||{}, contentDetails=metaItem.contentDetails||{};
+  const snip=metaItem.snippet||{},stats=metaItem.statistics||{},contentDetails=metaItem.contentDetails||{};
   const isShort=isShortDuration(contentDetails.duration);
-  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br>
-    <strong>Video ID:</strong> ${metaItem.id}<br>
-    <strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br>
-    <strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
-  const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
-  el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br>
-    <strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div>
-    <div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div>
-    <div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
+  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
 
-  let analyticsHtml='';
-  if(analyticsJson && analyticsJson.rows && analyticsJson.rows.length>0){
-    analyticsHtml += '<table><tr><th>Traffic Source</th><th>Country</th><th>Views</th></tr>';
-    for(let row of analyticsJson.rows){
-      const tsCode=row[0]||'OTHER';
-      const countryCode=row[1]||'Unknown';
-      const views=row[2]||0;
+  const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
+  el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div><div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div><div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
+
+  let analyticsHtml='<h4>Traffic Sources</h4>';
+  if(tsJson && tsJson.rows && tsJson.rows.length>0){
+    analyticsHtml += '<table><tr><th>Traffic Source</th><th>Views</th></tr>';
+    for(let row of tsJson.rows){
+      const tsCode = row[0]||'OTHER';
+      const views = row[1]||0;
       const tsPretty = trafficSourceMap[tsCode] || tsCode;
-      const countryPretty = countryMap[countryCode] || countryCode;
-      analyticsHtml += `<tr><td>${escapeHtml(tsPretty)}</td><td>${escapeHtml(countryPretty)}</td><td>${views}</td></tr>`;
+      analyticsHtml += `<tr><td>${escapeHtml(tsPretty)}</td><td>${views}</td></tr>`;
     }
     analyticsHtml += '</table>';
-  } else if(analyticsJson && analyticsJson.error){
-    analyticsHtml += `<div class="err">Analytics error: ${escapeHtml(typeof analyticsJson.error==='string'?analyticsJson.error:JSON.stringify(analyticsJson.error))}</div>`;
-  } else {
-    analyticsHtml += `<div class="warn">No analytics data returned.</div>`;
-  }
+  }else analyticsHtml+='<div class="warn">No traffic source data</div>';
+
+  analyticsHtml+='<h4>Countries</h4>';
+  if(cJson && cJson.rows && cJson.rows.length>0){
+    analyticsHtml += '<table><tr><th>Country</th><th>Views</th></tr>';
+    for(let row of cJson.rows){
+      const countryCode=row[0]||'Unknown';
+      const views=row[1]||0;
+      const countryPretty = countryMap[countryCode] || countryCode;
+      analyticsHtml += `<tr><td>${escapeHtml(countryPretty)}</td><td>${views}</td></tr>`;
+    }
+    analyticsHtml += '</table>';
+  }else analyticsHtml+='<div class="warn">No country data</div>';
+
   el('analytics').innerHTML = analyticsHtml;
 }
 
-// ---------------- TREND SUGGESTIONS ----------------
-async function generateTrendBasedSuggestions(originalTitle){
-  if(!originalTitle) return {titles:[],descriptions:[],hashtags:[]};
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(originalTitle)}&order=viewCount`;
-  const searchResp = await fetchWithAuth(searchUrl);
-  if(!searchResp.ok) return {titles:[],descriptions:[],hashtags:[]};
-  const searchJson = await searchResp.json();
-  const videos = searchJson.items||[];
-  let trendTitles=[],trendDescriptions=[],trendTags=[];
-  for(let v of videos){
-    trendTitles.push(v.snippet.title);
-    trendDescriptions.push(v.snippet.description.slice(0,200));
-    if(v.snippet.tags) trendTags.push(...v.snippet.tags);
-  }
-  const revampedTitles = trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t;return t2.replace(/\b(Roblox|TSB)\b/gi,m=>m.toUpperCase());}).slice(0,5);
-  const revampedDescriptions = trendDescriptions.map(d=>`🔥 ${d} Watch till the end for epic TSB action!`).slice(0,3);
-  let hashtags=[...new Set([...trendTags,...originalTitle.split(/\s+/)])].slice(0,15).map(h=>`#${h.replace(/\W/g,'')}`);
-  return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags};
-}
-
-function renderSuggestions(suggestions){
-  el('titles').innerHTML='';el('descriptions').innerHTML='';
-  suggestions.titles.forEach(t=>{
-    const btn=document.createElement('button');btn.textContent=t;btn.className='btn-inline';
-    btn.onclick=()=>{selectedTitle=t;updatePrediction();updateButtons(el('titles'),btn);};
-    el('titles').appendChild(btn);
-  });
-  suggestions.descriptions.forEach(d=>{
-    const btn=document.createElement('button');btn.textContent=d;btn.className='btn-inline';
-    btn.onclick=()=>{selectedDescription=d;updatePrediction();updateButtons(el('descriptions'),btn);};
-    el('descriptions').appendChild(btn);
-  });
-}
-
-// ---------------- PREDICTION ----------------
-async function updatePrediction(){
-  if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.';return;}
-  el('prediction').innerHTML='Calculating...';
-  const query=encodeURIComponent(selectedTitle); 
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
-  const searchResp = await fetchWithAuth(searchUrl);
-  const searchJson = await searchResp.json();
-  const videos = searchJson.items||[];
-  let avgViews=0,avgCTR=0,avgWatch=0; let count=0;
-  for(let v of videos){
-    if(!v.id.videoId) continue;
-    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${v.id.videoId}`;
-    const resp = await fetchWithAuth(videoUrl); const json = await resp.json();
-    if(!json.items||!json.items[0]) continue;
-    const stats=json.items[0].statistics||{}; const dur=json.items[0].contentDetails.duration||'PT0S';
-    const duration=parseISO8601(dur);
-    avgViews+=parseInt(stats.viewCount||0); avgCTR+=0.1; avgWatch+=duration*0.5; count++;
-  }
-  if(count>0){avgViews=Math.round(avgViews/count); avgWatch=Math.round(avgWatch/count); avgCTR=(avgCTR/count*100).toFixed(2);}
-  el('prediction').innerHTML=`<table><tr><th>Timeframe</th><th>Predicted Views</th><th>Predicted CTR</th><th>Predicted Avg Watch (s)</th></tr>
-  <tr><td>1 Day</td><td>${Math.round(avgViews/30)}</td><td>${avgCTR}%</td><td>${Math.round(avgWatch/30)}</td></tr>
-  <tr><td>1 Month</td><td>${avgViews}</td><td>${avgCTR}%</td><td>${avgWatch}</td></tr>
-  <tr><td>1 Year</td><td>${avgViews*12}</td><td>${avgCTR}%</td><td>${avgWatch*12}</td></tr></table>`;
-}
+// ---------------- CLEAR ----------------
+el('clearBtn').addEventListener('click',()=>{el('videoInput').value='';el('results').style.display='none';el('warnings').textContent='';el('raw').textContent='';el('titles').innerHTML='';el('descriptions').innerHTML='';el('prediction').innerHTML='';selectedTitle=null;selectedDescription=null;});
 </script>
 </body>
 </html>
