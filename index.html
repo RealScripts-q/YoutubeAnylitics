@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>YouTube Analytics + Optimizer</title>
+<title>YouTube Optimizer + Analytics (Enhanced)</title>
 <style>
 :root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
 body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
@@ -27,13 +27,13 @@ th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
 </head>
 <body>
 <div class="wrap">
-<h1>YouTube Analytics + Title/Description Optimizer</h1>
+<h1>YouTube Trend Optimizer + Detailed Analytics</h1>
 
 <div class="card">
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <div style="flex:1;min-width:220px">
       <label>OAuth Client ID</label>
-      <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
+      <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
       <div class="small">Google Cloud → OAuth 2.0 Client ID (Web app). Add this page origin as Authorized JS origin.</div>
     </div>
     <div style="min-width:220px"><label>&nbsp;</label><button id="authBtn" class="btn-inline">Sign in / Grant Access</button></div>
@@ -53,40 +53,13 @@ th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
 </div>
 
 <div id="results" style="display:none">
-  <div class="card">
-    <h3>Summary</h3>
-    <div id="summary"></div>
-  </div>
-
-  <div class="card">
-    <h3>Metadata</h3>
-    <div id="meta"></div>
-  </div>
-
-  <div class="card">
-    <h3>Analytics</h3>
-    <div id="analytics"></div>
-  </div>
-
-  <div class="card">
-    <h3>Select Title</h3>
-    <div id="titles"></div>
-  </div>
-
-  <div class="card">
-    <h3>Select Description</h3>
-    <div id="descriptions"></div>
-  </div>
-
-  <div class="card">
-    <h3>Predicted Performance</h3>
-    <div id="prediction"></div>
-  </div>
-
-  <div class="card">
-    <h3>Raw JSON</h3>
-    <pre id="raw"></pre>
-  </div>
+  <div class="card"><h3>Summary</h3><div id="summary"></div></div>
+  <div class="card"><h3>Metadata</h3><div id="meta"></div></div>
+  <div class="card"><h3>Analytics</h3><div id="analytics"></div></div>
+  <div class="card"><h3>Select Title</h3><div id="titles"></div></div>
+  <div class="card"><h3>Select Description</h3><div id="descriptions"></div></div>
+  <div class="card"><h3>Predicted Performance</h3><div id="prediction"></div></div>
+  <div class="card"><h3>Raw JSON</h3><pre id="raw"></pre></div>
 </div>
 </div>
 
@@ -96,224 +69,201 @@ const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/yt-analytics.readonly'
 ].join(' ');
-
-let tokenClient=null, accessToken=null, tokenExpiresAt=null, currentClientId='';
+let tokenClient=null,accessToken=null,tokenExpiresAt=null,currentClientId='';
 const el=id=>document.getElementById(id);
-let selectedTitle=null, selectedDescription=null;
 
-const trafficSourceMap = {
-  YT_SEARCH: 'YouTube Search',
-  YT_WATCH: 'Suggested / Recommended',
-  YT_CHANNEL: 'YouTube Channel',
-  EXTERNAL: 'External Websites',
-  PLAYLIST: 'Playlist',
-  NOTIFICATIONS: 'Notification',
-  SUBSCRIPTION: 'Subscription Feed',
-  YT_SHORTS: 'YouTube Shorts',
-  OTHER: 'Other'
-};
-
-const countryMap = {
-  US: 'United States', CA: 'Canada', GB: 'United Kingdom', IN: 'India', AU: 'Australia',
-  DE: 'Germany', FR: 'France', BR: 'Brazil', JP: 'Japan', RU: 'Russia', CN: 'China'
-};
-
-// ---------------- OAuth ----------------
 el('authBtn').addEventListener('click',()=>{
   currentClientId=el('clientId').value.trim();
   if(!currentClientId||currentClientId.startsWith('ENTER_')){alert('Enter OAuth Client ID');return;}
   initTokenClient(currentClientId);
   tokenClient.requestAccessToken({prompt:'consent'});
 });
-
 el('signoutBtn').addEventListener('click',()=>{
-  accessToken=null; tokenExpiresAt=null;
-  localStorage.removeItem('yt_aud_token'); updateAuthUI();
+  accessToken=null;tokenExpiresAt=null;
+  localStorage.removeItem('yt_aud_token');
+  updateAuthUI();
   el('warnings').textContent='Signed out';
 });
 
 function updateAuthUI(){
-  el('authStatus').innerHTML = (accessToken && tokenExpiresAt && Date.now()<tokenExpiresAt) ?
-    'Signed in — token valid until '+new Date(tokenExpiresAt).toLocaleString() :
-    'Not signed in / token expired';
+  el('authStatus').innerHTML=(accessToken&&tokenExpiresAt&&Date.now()<tokenExpiresAt)
+    ?'Signed in — token valid until '+new Date(tokenExpiresAt).toLocaleString()
+    :'Not signed in / token expired';
 }
 
 function initTokenClient(clientId){
-  if(tokenClient && currentClientId === clientId) return;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: SCOPES,
-    callback: resp => {
-      if(resp.error){ el('warnings').textContent = 'Token error: ' + (resp.error_description || resp.error); return; }
-      accessToken = resp.access_token;
-      tokenExpiresAt = Date.now() + (resp.expires_in ? resp.expires_in*1000 : 3600*1000);
-      localStorage.setItem('yt_aud_token', JSON.stringify({token:accessToken,expiresAt:tokenExpiresAt}));
-      updateAuthUI(); el('warnings').textContent = 'Access token acquired.';
+  if(tokenClient&&currentClientId===clientId)return;
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:clientId,scope:SCOPES,callback:resp=>{
+      if(resp.error){el('warnings').textContent='Token error: '+(resp.error_description||resp.error);return;}
+      accessToken=resp.access_token;
+      tokenExpiresAt=Date.now()+(resp.expires_in?resp.expires_in*1000:(60*60*1000));
+      localStorage.setItem('yt_aud_token',JSON.stringify({token:accessToken,expiresAt:tokenExpiresAt}));
+      updateAuthUI();el('warnings').textContent='Access token acquired.';
     }
   });
 }
 
-(function restoreToken(){
+// Restore token
+(function(){
   try{
-    const saved = JSON.parse(localStorage.getItem('yt_aud_token')||'null');
-    if(saved && saved.token && saved.expiresAt && Date.now()<saved.expiresAt){
-      accessToken = saved.token; tokenExpiresAt = saved.expiresAt;
-      updateAuthUI(); el('warnings').textContent = 'Restored previous session.';
+    const saved=JSON.parse(localStorage.getItem('yt_aud_token')||'null');
+    if(saved&&saved.token&&saved.expiresAt&&Date.now()<saved.expiresAt){
+      accessToken=saved.token;tokenExpiresAt=saved.expiresAt;updateAuthUI();
     }
   }catch(e){}
 })();
 
-function extractVideoId(input){if(!input) return null;input=input.trim();const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;const m=input.match(re);if(m) return m[1];if(/^[A-Za-z0-9_-]{11}$/.test(input)) return input;return null;}
-function fetchWithAuth(url){return fetch(url,{headers:{Authorization:'Bearer '+accessToken}});}
-function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function parseISO8601(dur){const m=dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);if(!m)return 0;return(parseInt(m[1]||0)*3600+parseInt(m[2]||0)*60+parseInt(m[3]||0));}
-function isShortDuration(iso){if(!iso) return false; const m=iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);if(!m)return false; const h=parseInt(m[1]||0),mm=parseInt(m[2]||0),s=parseInt(m[3]||0); return h*3600+mm*60+s<=60;}
-function updateButtons(container,selectedBtn){Array.from(container.children).forEach(b=>b.classList.remove('btn-selected'));selectedBtn.classList.add('btn-selected');}
+function extractVideoId(input){
+  if(!input)return null;
+  input=input.trim();
+  const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;
+  const m=input.match(re);
+  if(m)return m[1];
+  if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;
+  return null;
+}
 
-// ---------------- ANALYZE ----------------
 el('analyzeBtn').addEventListener('click',async()=>{
-  el('warnings').textContent=''; el('results').style.display='none';
-  const raw=el('videoInput').value.trim(); const vid=extractVideoId(raw);
-  if(!vid){el('warnings').textContent='Invalid video ID';return;} if(!accessToken){el('warnings').textContent='No access token';return;}
+  el('warnings').textContent='';el('results').style.display='none';
+  const raw=el('videoInput').value.trim();
+  const vid=extractVideoId(raw);
+  if(!vid){el('warnings').textContent='Invalid video ID';return;}
+  if(!accessToken){el('warnings').textContent='No access token';return;}
 
   try{
-    // Metadata & up-to-date views
-    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${vid}`;
-    const metaResp=await fetchWithAuth(videoUrl); if(!metaResp.ok) throw new Error('videos.list failed: '+metaResp.status);
-    const metaJson = await metaResp.json(); if(!metaJson.items || metaJson.items.length===0){el('warnings').textContent='Video not found';return;}
+    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}`;
+    const metaResp=await fetchWithAuth(videoUrl);
+    const metaJson=await metaResp.json();
+    if(!metaJson.items||!metaJson.items.length){el('warnings').textContent='Video not found';return;}
     const item=metaJson.items[0];
 
-    // Analytics - traffic sources
-    const end=new Date(), start=new Date(); start.setDate(end.getDate()-90);
-    const startStr=start.toISOString().slice(0,10), endStr=end.toISOString().slice(0,10);
+    const end=new Date(),start=new Date();start.setDate(end.getDate()-90);
+    const startStr=start.toISOString().slice(0,10),endStr=end.toISOString().slice(0,10);
+    const ids='channel==MINE',filters=`video==${vid}`;
+    const base=`https://youtubeanalytics.googleapis.com/v2/reports?ids=${ids}&filters=${filters}&startDate=${startStr}&endDate=${endStr}`;
 
-    const ids = 'channel==MINE';
-    const metricsTS = 'views';
-    const dimensionsTS = 'insightTrafficSourceType';
-    const filtersTS = `video==${vid}`;
-    const tsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsTS}&dimensions=${dimensionsTS}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersTS}`;
-    let tsResp = await fetchWithAuth(tsUrl); let tsJson = tsResp.ok ? await tsResp.json() : {rows:[]};
-    if(!tsJson.rows || tsJson.rows.length===0){
-      // fallback to channel-level
-      const fallbackUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsTS}&dimensions=${dimensionsTS}&startDate=${startStr}&endDate=${endStr}&ids=${ids}`;
-      const fallbackResp = await fetchWithAuth(fallbackUrl);
-      tsJson = fallbackResp.ok ? await fallbackResp.json() : {rows:[]};
-    }
+    const metrics='views'; 
+    const sourceUrl=`${base}&metrics=${metrics}&dimensions=insightTrafficSourceType`;
+    const countryUrl=`${base}&metrics=${metrics}&dimensions=country`;
 
-    const metricsC = 'views';
-    const dimensionsC = 'country';
-    const filtersC = `video==${vid}`;
-    const countryUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersC}`;
-    let countryResp = await fetchWithAuth(countryUrl); let countryJson = countryResp.ok ? await countryResp.json() : {rows:[]};
-    if(!countryJson.rows || countryJson.rows.length===0){
-      const fallbackCountryUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}`;
-      const fallbackCountryResp = await fetchWithAuth(fallbackCountryUrl);
-      countryJson = fallbackCountryResp.ok ? await fallbackCountryResp.json() : {rows:[]};
-    }
+    const [sourceResp,countryResp]=await Promise.all([fetchWithAuth(sourceUrl),fetchWithAuth(countryUrl)]);
+    const trafficJson=sourceResp.ok?await sourceResp.json():{};
+    const countryJson=countryResp.ok?await countryResp.json():{};
 
-    renderResults(item,tsJson,countryJson,{startDate:startStr,endDate:endStr});
-    const suggestions=await generateTrendBasedSuggestions(item.snippet.title);
-    renderSuggestions(suggestions);
-    el('raw').textContent=JSON.stringify({meta:metaJson,trafficSources:tsJson,countries:countryJson},null,2);
-  }catch(err){console.error(err); el('warnings').textContent='Error: '+(err.message||err);}
+    renderResults(item,trafficJson,countryJson,{startDate:startStr,endDate:endStr});
+    await generateTrendBasedSuggestions(item.snippet.title);
+    el('raw').textContent=JSON.stringify({meta:metaJson,traffic:trafficJson,country:countryJson},null,2);
+  }catch(err){console.error(err);el('warnings').textContent='Error: '+(err.message||err);}
 });
 
 el('clearBtn').addEventListener('click',()=>{
-  el('videoInput').value=''; el('results').style.display='none'; el('warnings').textContent='';
-  el('raw').textContent=''; el('titles').innerHTML=''; el('descriptions').innerHTML='';
-  el('prediction').innerHTML=''; selectedTitle=null; selectedDescription=null;
+  ['videoInput','warnings','raw','titles','descriptions','prediction'].forEach(id=>el(id).textContent='');
+  el('results').style.display='none';
 });
 
-// ---------------- RENDER RESULTS ----------------
+async function fetchWithAuth(url){return fetch(url,{headers:{Authorization:'Bearer '+accessToken}});}
+
 function renderResults(metaItem,trafficJson,countryJson,meta){
   el('results').style.display='block';
-  const snip=metaItem.snippet||{}, stats=metaItem.statistics||{}, contentDetails=metaItem.contentDetails||{};
+  const snip=metaItem.snippet||{},stats=metaItem.statistics||{},contentDetails=metaItem.contentDetails||{};
   const isShort=isShortDuration(contentDetails.duration);
-
-  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
-
-  const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
+  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title)}<br>
+  <strong>Video ID:</strong> ${metaItem.id}<br>
+  <strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br>
+  <strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
+  const thumb=snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default);
   el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div>
-    <div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div>
-  </div>
-  <div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
+    <div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title)}<br><br>
+    <strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div>
+    <div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div>
+    <div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
 
-  // Traffic sources table
-  let tsHtml='<strong>Traffic Sources</strong><br>';
-  if(trafficJson.rows && trafficJson.rows.length>0){
-    tsHtml+='<table><tr><th>Source</th><th>Views</th></tr>';
+  // Traffic sources
+  let analyticsHtml='<h4>Traffic Sources</h4>';
+  if(trafficJson.rows){
+    analyticsHtml+=`<table><tr><th>Source</th><th>Views</th></tr>`;
     trafficJson.rows.forEach(r=>{
-      const source = trafficSourceMap[r[0]]||r[0];
-      tsHtml+=`<tr><td>${source}</td><td>${r[1]}</td></tr>`;
+      const src=prettySource(r[0]);
+      analyticsHtml+=`<tr><td>${src}</td><td>${r[1]}</td></tr>`;
     });
-    tsHtml+='</table>';
-  } else tsHtml+='<div class="warn">No traffic source data</div>';
-  // Countries table
-  let countryHtml='<strong>Countries</strong><br>';
-  if(countryJson.rows && countryJson.rows.length>0){
-    countryHtml+='<table><tr><th>Country</th><th>Views</th></tr>';
+    analyticsHtml+='</table>';
+  }else analyticsHtml+='<div class="warn">No traffic source data</div>';
+
+  analyticsHtml+='<h4>Countries</h4>';
+  if(countryJson.rows){
+    analyticsHtml+=`<table><tr><th>Country</th><th>Views</th></tr>`;
     countryJson.rows.forEach(r=>{
-      const country = countryMap[r[0]]||r[0];
-      countryHtml+=`<tr><td>${country}</td><td>${r[1]}</td></tr>`;
+      analyticsHtml+=`<tr><td>${countryName(r[0])}</td><td>${r[1]}</td></tr>`;
     });
-    countryHtml+='</table>';
-  } else countryHtml+='<div class="warn">No country data</div>';
+    analyticsHtml+='</table>';
+  }else analyticsHtml+='<div class="warn">No country data</div>';
 
-  el('analytics').innerHTML=tsHtml+countryHtml;
+  el('analytics').innerHTML=analyticsHtml;
 }
 
-// ---------------- TREND SUGGESTIONS ----------------
-async function generateTrendBasedSuggestions(originalTitle){
-  if(!originalTitle) return {titles:[],descriptions:[],hashtags:[]};
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(originalTitle)}&order=viewCount`;
-  const searchResp=await fetchWithAuth(searchUrl); if(!searchResp.ok) return {titles:[],descriptions:[],hashtags:[]};
-  const searchJson=await searchResp.json(); const videos=searchJson.items||[];
-  let trendTitles=[],trendDescriptions=[],trendTags=[];
-  for(let v of videos){trendTitles.push(v.snippet.title); trendDescriptions.push(v.snippet.description.slice(0,200)); if(v.snippet.tags) trendTags.push(...v.snippet.tags);}
-  const revampedTitles=trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t; return t2.replace(/\b(Roblox|TSB)\b/gi,m=>m.toUpperCase());}).slice(0,5);
-  const revampedDescriptions=trendDescriptions.map(d=>`🔥 ${d} Watch till the end for epic TSB action!`).slice(0,3);
-  let hashtags=[...new Set([...trendTags,...originalTitle.split(/\s+/)])].slice(0,15).map(h=>`#${h.replace(/\W/g,'')}`);
-  return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags};
+// Country + Source mappings
+function countryName(code){return new Intl.DisplayNames(['en'],{type:'region'}).of(code)||code;}
+function prettySource(code){
+  const map={
+    SHORTS:'YouTube Shorts feed',YT_SEARCH:'YouTube Search',NO_LINK_OTHER:'External',SUBSCRIBER:'Subscribers',
+    YT_OTHER_PAGE:'Other YouTube pages',CHANNEL:'Channel page',PLAYLIST:'Playlist',NOTIFICATION:'Notifications',
+    RELATED_VIDEO:'Suggested videos',EXT_URL:'External sites'
+  };return map[code]||code;
 }
 
-function renderSuggestions(suggestions){
-  el('titles').innerHTML=''; el('descriptions').innerHTML='';
-  suggestions.titles.forEach(t=>{
-    const btn=document.createElement('button'); btn.textContent=t; btn.className='btn-inline';
-    btn.onclick=()=>{selectedTitle=t;updatePrediction();updateButtons(el('titles'),btn);};
-    el('titles').appendChild(btn);
+// Suggestion + "Load More"
+let nextPageToken=null,currentQuery=null;
+async function generateTrendBasedSuggestions(originalTitle,append=false){
+  if(!originalTitle)return{titles:[],descriptions:[],hashtags:[]};
+  if(!append){nextPageToken=null;currentQuery=originalTitle;}
+  let url=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(currentQuery)}&order=viewCount`;
+  if(append&&nextPageToken)url+=`&pageToken=${nextPageToken}`;
+  const resp=await fetchWithAuth(url);
+  const json=await resp.json();
+  nextPageToken=json.nextPageToken||null;
+  const videos=json.items||[];
+  const titles=videos.map(v=>v.snippet.title.slice(0,60));
+  const descs=videos.map(v=>'🔥 '+v.snippet.description.slice(0,150));
+  renderSuggestions({titles,descriptions:descs},append);
+}
+function renderSuggestions(s,append=false){
+  if(!append){el('titles').innerHTML='';el('descriptions').innerHTML='';}
+  s.titles.forEach(t=>{
+    const b=document.createElement('button');b.textContent=t;b.className='btn-inline';
+    b.onclick=()=>{selectedTitle=t;updatePrediction();updateButtons(el('titles'),b);};
+    el('titles').appendChild(b);
   });
-  suggestions.descriptions.forEach(d=>{
-    const btn=document.createElement('button'); btn.textContent=d; btn.className='btn-inline';
-    btn.onclick=()=>{selectedDescription=d;updatePrediction();updateButtons(el('descriptions'),btn);};
-    el('descriptions').appendChild(btn);
+  s.descriptions.forEach(d=>{
+    const b=document.createElement('button');b.textContent=d;b.className='btn-inline';
+    b.onclick=()=>{selectedDescription=d;updatePrediction();updateButtons(el('descriptions'),b);};
+    el('descriptions').appendChild(b);
   });
-  if(el('hashtags')) el('hashtags').innerHTML=suggestions.hashtags.map(h=>`<span style="margin:3px;">${h}</span>`).join('');
-}
-
-// ---------------- PREDICTION ----------------
-async function updatePrediction(){
-  if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.'; return;}
-  el('prediction').innerHTML='Calculating...';
-  const query=encodeURIComponent(selectedTitle); 
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
-  const searchResp=await fetchWithAuth(searchUrl);
-  const searchJson=await searchResp.json(); const videos=searchJson.items||[];
-  let avgViews=0,avgCTR=0,avgWatch=0; let count=0;
-  for(let v of videos){if(!v.id.videoId) continue;
-    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${v.id.videoId}`;
-    const resp=await fetchWithAuth(videoUrl); const json=await resp.json(); if(!json.items||!json.items[0]) continue;
-    const stats=json.items[0].statistics||{}; const dur=json.items[0].contentDetails.duration||'PT0S';
-    const duration=parseISO8601(dur);
-    avgViews+=parseInt(stats.viewCount||0); avgCTR+=0.1; avgWatch+=duration*0.5; count++;
+  let load=el('loadMoreBtn');
+  if(!load){
+    load=document.createElement('button');load.id='loadMoreBtn';load.textContent='Load More';load.className='btn-inline';load.style.marginTop='10px';
+    load.onclick=loadMoreSuggestions;el('descriptions').parentNode.appendChild(load);
   }
-  if(count>0){avgViews=Math.round(avgViews/count); avgWatch=Math.round(avgWatch/count); avgCTR=(avgCTR/count*100).toFixed(2);}
-  el('prediction').innerHTML=`<table><tr><th>Timeframe</th><th>Predicted Views</th><th>Predicted CTR</th><th>Predicted Avg Watch (s)</th></tr>
-  <tr><td>1 Day</td><td>${Math.round(avgViews/30)}</td><td>${avgCTR}%</td><td>${Math.round(avgWatch/30)}</td></tr>
-  <tr><td>1 Month</td><td>${avgViews}</td><td>${avgCTR}%</td><td>${avgWatch}</td></tr>
-  <tr><td>1 Year</td><td>${avgViews*12}</td><td>${avgCTR}%</td><td>${avgWatch*12}</td></tr></table>`;
+  load.style.display=nextPageToken?'inline-block':'none';
 }
+async function loadMoreSuggestions(){if(nextPageToken&&currentQuery)await generateTrendBasedSuggestions(currentQuery,true);}
+
+let selectedTitle=null,selectedDescription=null;
+async function updatePrediction(){
+  if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.';return;}
+  el('prediction').innerHTML='Calculating...';
+  const q=encodeURIComponent(selectedTitle);
+  const resp=await fetchWithAuth(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${q}&order=viewCount`);
+  const js=await resp.json();const v=js.items||[];
+  let avg=0,c=0;
+  for(const i of v){if(i.id.videoId){const r=await fetchWithAuth(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${i.id.videoId}`);const j=await r.json();if(j.items&&j.items[0]){avg+=parseInt(j.items[0].statistics.viewCount||0);c++;}}}
+  avg=c?Math.round(avg/c):0;
+  el('prediction').innerHTML=`<strong>Predicted Monthly Views:</strong> ${avg}`;
+}
+
+function updateButtons(c,s){Array.from(c.children).forEach(b=>b.classList.remove('btn-selected'));s.classList.add('btn-selected');}
+function isShortDuration(iso){const m=iso.match(/PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?/);if(!m)return false;const h=parseInt(m[1]||0),mm=parseInt(m[2]||0),s=parseInt(m[3]||0);return h*3600+mm*60+s<=60;}
+function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
 </body>
 </html>
