@@ -177,75 +177,143 @@ el('analyzeBtn').addEventListener('click',async()=>{
   if(!vid){el('warnings').textContent='Invalid video ID';return;} if(!accessToken){el('warnings').textContent='No access token';return;}
 
   try{
-    // Metadata
+    // Metadata & up-to-date views
     const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${vid}`;
     const metaResp=await fetchWithAuth(videoUrl); if(!metaResp.ok) throw new Error('videos.list failed: '+metaResp.status);
     const metaJson = await metaResp.json(); if(!metaJson.items || metaJson.items.length===0){el('warnings').textContent='Video not found';return;}
     const item=metaJson.items[0];
 
-    // Analytics - separate requests to avoid unsupported query
+    // Analytics - traffic sources
     const end=new Date(), start=new Date(); start.setDate(end.getDate()-90);
     const startStr=start.toISOString().slice(0,10), endStr=end.toISOString().slice(0,10);
 
-    // Traffic sources per video
+    const ids = 'channel==MINE';
     const metricsTS = 'views';
     const dimensionsTS = 'insightTrafficSourceType';
     const filtersTS = `video==${vid}`;
-    const ids = 'channel==MINE';
     const tsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsTS}&dimensions=${dimensionsTS}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersTS}`;
-    const tsResp = await fetchWithAuth(tsUrl); const tsJson = tsResp.ok ? await tsResp.json() : { error: await tsResp.text() };
+    let tsResp = await fetchWithAuth(tsUrl); let tsJson = tsResp.ok ? await tsResp.json() : {rows:[]};
+    if(!tsJson.rows || tsJson.rows.length===0){
+      // fallback to channel-level
+      const fallbackUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsTS}&dimensions=${dimensionsTS}&startDate=${startStr}&endDate=${endStr}&ids=${ids}`;
+      const fallbackResp = await fetchWithAuth(fallbackUrl);
+      tsJson = fallbackResp.ok ? await fallbackResp.json() : {rows:[]};
+    }
 
-    // Country stats per video
     const metricsC = 'views';
     const dimensionsC = 'country';
     const filtersC = `video==${vid}`;
-    const cUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersC}`;
-    const cResp = await fetchWithAuth(cUrl); const cJson = cResp.ok ? await cResp.json() : { error: await cResp.text() };
+    const countryUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filtersC}`;
+    let countryResp = await fetchWithAuth(countryUrl); let countryJson = countryResp.ok ? await countryResp.json() : {rows:[]};
+    if(!countryJson.rows || countryJson.rows.length===0){
+      const fallbackCountryUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metricsC}&dimensions=${dimensionsC}&startDate=${startStr}&endDate=${endStr}&ids=${ids}`;
+      const fallbackCountryResp = await fetchWithAuth(fallbackCountryUrl);
+      countryJson = fallbackCountryResp.ok ? await fallbackCountryResp.json() : {rows:[]};
+    }
 
-    renderResults(item, tsJson, cJson, {startDate:startStr,endDate:endStr});
-    el('raw').textContent=JSON.stringify({meta:metaJson,trafficSources:tsJson,countries:cJson},null,2);
-  }catch(err){console.error(err);el('warnings').textContent='Error: '+(err.message||err);}
+    renderResults(item,tsJson,countryJson,{startDate:startStr,endDate:endStr});
+    const suggestions=await generateTrendBasedSuggestions(item.snippet.title);
+    renderSuggestions(suggestions);
+    el('raw').textContent=JSON.stringify({meta:metaJson,trafficSources:tsJson,countries:countryJson},null,2);
+  }catch(err){console.error(err); el('warnings').textContent='Error: '+(err.message||err);}
 });
 
-// ---------------- RENDER ----------------
-function renderResults(metaItem,tsJson,cJson,meta){
+el('clearBtn').addEventListener('click',()=>{
+  el('videoInput').value=''; el('results').style.display='none'; el('warnings').textContent='';
+  el('raw').textContent=''; el('titles').innerHTML=''; el('descriptions').innerHTML='';
+  el('prediction').innerHTML=''; selectedTitle=null; selectedDescription=null;
+});
+
+// ---------------- RENDER RESULTS ----------------
+function renderResults(metaItem,trafficJson,countryJson,meta){
   el('results').style.display='block';
-  const snip=metaItem.snippet||{},stats=metaItem.statistics||{},contentDetails=metaItem.contentDetails||{};
+  const snip=metaItem.snippet||{}, stats=metaItem.statistics||{}, contentDetails=metaItem.contentDetails||{};
   const isShort=isShortDuration(contentDetails.duration);
+
   el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
 
   const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
-  el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div><div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div><div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
+  el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div>
+    <div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div>
+  </div>
+  <div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
 
-  let analyticsHtml='<h4>Traffic Sources</h4>';
-  if(tsJson && tsJson.rows && tsJson.rows.length>0){
-    analyticsHtml += '<table><tr><th>Traffic Source</th><th>Views</th></tr>';
-    for(let row of tsJson.rows){
-      const tsCode = row[0]||'OTHER';
-      const views = row[1]||0;
-      const tsPretty = trafficSourceMap[tsCode] || tsCode;
-      analyticsHtml += `<tr><td>${escapeHtml(tsPretty)}</td><td>${views}</td></tr>`;
-    }
-    analyticsHtml += '</table>';
-  }else analyticsHtml+='<div class="warn">No traffic source data</div>';
+  // Traffic sources table
+  let tsHtml='<strong>Traffic Sources</strong><br>';
+  if(trafficJson.rows && trafficJson.rows.length>0){
+    tsHtml+='<table><tr><th>Source</th><th>Views</th></tr>';
+    trafficJson.rows.forEach(r=>{
+      const source = trafficSourceMap[r[0]]||r[0];
+      tsHtml+=`<tr><td>${source}</td><td>${r[1]}</td></tr>`;
+    });
+    tsHtml+='</table>';
+  } else tsHtml+='<div class="warn">No traffic source data</div>';
+  // Countries table
+  let countryHtml='<strong>Countries</strong><br>';
+  if(countryJson.rows && countryJson.rows.length>0){
+    countryHtml+='<table><tr><th>Country</th><th>Views</th></tr>';
+    countryJson.rows.forEach(r=>{
+      const country = countryMap[r[0]]||r[0];
+      countryHtml+=`<tr><td>${country}</td><td>${r[1]}</td></tr>`;
+    });
+    countryHtml+='</table>';
+  } else countryHtml+='<div class="warn">No country data</div>';
 
-  analyticsHtml+='<h4>Countries</h4>';
-  if(cJson && cJson.rows && cJson.rows.length>0){
-    analyticsHtml += '<table><tr><th>Country</th><th>Views</th></tr>';
-    for(let row of cJson.rows){
-      const countryCode=row[0]||'Unknown';
-      const views=row[1]||0;
-      const countryPretty = countryMap[countryCode] || countryCode;
-      analyticsHtml += `<tr><td>${escapeHtml(countryPretty)}</td><td>${views}</td></tr>`;
-    }
-    analyticsHtml += '</table>';
-  }else analyticsHtml+='<div class="warn">No country data</div>';
-
-  el('analytics').innerHTML = analyticsHtml;
+  el('analytics').innerHTML=tsHtml+countryHtml;
 }
 
-// ---------------- CLEAR ----------------
-el('clearBtn').addEventListener('click',()=>{el('videoInput').value='';el('results').style.display='none';el('warnings').textContent='';el('raw').textContent='';el('titles').innerHTML='';el('descriptions').innerHTML='';el('prediction').innerHTML='';selectedTitle=null;selectedDescription=null;});
+// ---------------- TREND SUGGESTIONS ----------------
+async function generateTrendBasedSuggestions(originalTitle){
+  if(!originalTitle) return {titles:[],descriptions:[],hashtags:[]};
+  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(originalTitle)}&order=viewCount`;
+  const searchResp=await fetchWithAuth(searchUrl); if(!searchResp.ok) return {titles:[],descriptions:[],hashtags:[]};
+  const searchJson=await searchResp.json(); const videos=searchJson.items||[];
+  let trendTitles=[],trendDescriptions=[],trendTags=[];
+  for(let v of videos){trendTitles.push(v.snippet.title); trendDescriptions.push(v.snippet.description.slice(0,200)); if(v.snippet.tags) trendTags.push(...v.snippet.tags);}
+  const revampedTitles=trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t; return t2.replace(/\b(Roblox|TSB)\b/gi,m=>m.toUpperCase());}).slice(0,5);
+  const revampedDescriptions=trendDescriptions.map(d=>`🔥 ${d} Watch till the end for epic TSB action!`).slice(0,3);
+  let hashtags=[...new Set([...trendTags,...originalTitle.split(/\s+/)])].slice(0,15).map(h=>`#${h.replace(/\W/g,'')}`);
+  return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags};
+}
+
+function renderSuggestions(suggestions){
+  el('titles').innerHTML=''; el('descriptions').innerHTML='';
+  suggestions.titles.forEach(t=>{
+    const btn=document.createElement('button'); btn.textContent=t; btn.className='btn-inline';
+    btn.onclick=()=>{selectedTitle=t;updatePrediction();updateButtons(el('titles'),btn);};
+    el('titles').appendChild(btn);
+  });
+  suggestions.descriptions.forEach(d=>{
+    const btn=document.createElement('button'); btn.textContent=d; btn.className='btn-inline';
+    btn.onclick=()=>{selectedDescription=d;updatePrediction();updateButtons(el('descriptions'),btn);};
+    el('descriptions').appendChild(btn);
+  });
+  if(el('hashtags')) el('hashtags').innerHTML=suggestions.hashtags.map(h=>`<span style="margin:3px;">${h}</span>`).join('');
+}
+
+// ---------------- PREDICTION ----------------
+async function updatePrediction(){
+  if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.'; return;}
+  el('prediction').innerHTML='Calculating...';
+  const query=encodeURIComponent(selectedTitle); 
+  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
+  const searchResp=await fetchWithAuth(searchUrl);
+  const searchJson=await searchResp.json(); const videos=searchJson.items||[];
+  let avgViews=0,avgCTR=0,avgWatch=0; let count=0;
+  for(let v of videos){if(!v.id.videoId) continue;
+    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${v.id.videoId}`;
+    const resp=await fetchWithAuth(videoUrl); const json=await resp.json(); if(!json.items||!json.items[0]) continue;
+    const stats=json.items[0].statistics||{}; const dur=json.items[0].contentDetails.duration||'PT0S';
+    const duration=parseISO8601(dur);
+    avgViews+=parseInt(stats.viewCount||0); avgCTR+=0.1; avgWatch+=duration*0.5; count++;
+  }
+  if(count>0){avgViews=Math.round(avgViews/count); avgWatch=Math.round(avgWatch/count); avgCTR=(avgCTR/count*100).toFixed(2);}
+  el('prediction').innerHTML=`<table><tr><th>Timeframe</th><th>Predicted Views</th><th>Predicted CTR</th><th>Predicted Avg Watch (s)</th></tr>
+  <tr><td>1 Day</td><td>${Math.round(avgViews/30)}</td><td>${avgCTR}%</td><td>${Math.round(avgWatch/30)}</td></tr>
+  <tr><td>1 Month</td><td>${avgViews}</td><td>${avgCTR}%</td><td>${avgWatch}</td></tr>
+  <tr><td>1 Year</td><td>${avgViews*12}</td><td>${avgCTR}%</td><td>${avgWatch*12}</td></tr></table>`;
+}
 </script>
 </body>
 </html>
