@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>YouTube Video Optimization + Prediction</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>YouTube Title/Description Optimizer + Predicted Analytics</title>
 <style>
 :root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
 body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
@@ -11,140 +11,142 @@ body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",
 h1{font-size:20px;margin:6px 0}
 label{display:block;margin-top:12px;font-weight:700;color:var(--muted)}
 input,button,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6eef6;background:var(--card)}
-.row{display:flex;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
 .col{flex:1}
 .card{background:var(--card);padding:12px;border-radius:12px;border:1px solid #e6eef6;margin-top:12px}
 .muted{color:var(--muted)}
 .ok{color:green}.warn{color:orange}.err{color:red}
 img.thumb{max-width:320px;border-radius:8px;margin-top:8px}
 pre{background:#0b1220;color:#e6eef6;padding:10px;border-radius:8px;overflow:auto}
-.btn-inline{display:inline-block;padding:8px 12px;border-radius:8px;background:#0ea5a9;color:white;border:none;cursor:pointer;margin:2px}
-.btn-selected{border:2px solid #ef4444}
+.btn-inline{display:inline-block;padding:8px 12px;border-radius:8px;background:#0ea5a9;color:white;border:none;cursor:pointer;margin:3px}
+.btn-selected{background:#facc15;color:#0f172a;}
 .small{font-size:13px;color:var(--muted)}
-table{border-collapse:collapse;margin-top:12px}
-th,td{border:1px solid #ccc;padding:6px}
+table{border-collapse:collapse;width:100%;margin-top:12px}
+th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>YouTube Video Title/Description Optimizer & Prediction</h1>
+<h1>YouTube Trend-Based Optimizer + Predicted Analytics</h1>
 
 <div class="card">
-<label>OAuth Client ID</label>
-<input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com"/>
-<div class="small">Create OAuth 2.0 Web Client. Add this page origin to Authorized JS origins.</div>
-<div style="display:flex;gap:10px;margin-top:8px">
-<button id="authBtn" class="btn-inline">Sign in / Grant Access</button>
-<button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button>
-</div>
-<div id="authStatus" class="small muted" style="margin-top:8px">Not signed in</div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <label>OAuth Client ID</label>
+      <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
+      <div class="small">Google Cloud → OAuth 2.0 Client ID (Web app). Add this page origin as Authorized JS origin.</div>
+    </div>
+    <div style="min-width:220px"><label>&nbsp;</label><button id="authBtn" class="btn-inline">Sign in / Grant Access</button></div>
+    <div style="min-width:220px"><label>&nbsp;</label><button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button></div>
+  </div>
+  <div id="authStatus" class="small muted" style="margin-top:8px">Not signed in</div>
 </div>
 
 <div class="card">
-<label>Video URL or ID</label>
-<input id="videoInput" placeholder="https://youtu.be/XXXXX or video id"/>
-<div class="row" style="margin-top:10px">
-<div class="col"><button id="analyzeBtn" class="btn-inline">Analyze</button></div>
-<div class="col"><button id="clearBtn" class="btn-inline" style="background:#6b7280">Clear</button></div>
-</div>
-<div id="warnings" class="small muted" style="margin-top:8px"></div>
+  <label>Video URL or ID</label>
+  <input id="videoInput" placeholder="https://youtu.be/XXXXX or /shorts/XXXXX or video id" />
+  <div class="row" style="margin-top:10px">
+    <div class="col"><button id="analyzeBtn" class="btn-inline">Analyze</button></div>
+    <div class="col"><button id="clearBtn" class="btn-inline" style="background:#6b7280">Clear</button></div>
+  </div>
+  <div id="warnings" class="small muted" style="margin-top:8px"></div>
 </div>
 
 <div id="results" style="display:none">
-<div class="card">
-<h3>Current Video Analytics</h3>
-<div id="summary"></div>
-<div id="meta"></div>
-<div id="analytics"></div>
-</div>
 
-<div class="card">
-<h3>Suggested Titles</h3>
-<div id="titles"></div>
-<h3>Suggested Descriptions</h3>
-<div id="descriptions"></div>
-<h3>Suggested Hashtags</h3>
-<div id="hashtags"></div>
-</div>
+  <div class="card">
+    <h3>Summary</h3>
+    <div id="summary"></div>
+  </div>
 
-<div class="card">
-<h3>Predicted Performance</h3>
-<div id="prediction"></div>
-</div>
+  <div class="card">
+    <h3>Metadata</h3>
+    <div id="meta"></div>
+  </div>
 
-<div class="card">
-<h3>Raw JSON</h3>
-<pre id="raw"></pre>
-</div>
-</div>
+  <div class="card">
+    <h3>Analytics</h3>
+    <div id="analytics"></div>
+  </div>
 
-<div class="card small muted" style="margin-top:18px">
-<ul>
-<li>Token allows YouTube Data & Analytics API calls.</li>
-<li>Add your origin to OAuth client's JS origins to avoid CORS issues.</li>
-</ul>
+  <div class="card">
+    <h3>Select Title</h3>
+    <div id="titles"></div>
+  </div>
+
+  <div class="card">
+    <h3>Select Description</h3>
+    <div id="descriptions"></div>
+  </div>
+
+  <div class="card">
+    <h3>Predicted Performance</h3>
+    <div id="prediction"></div>
+  </div>
+
+  <div class="card">
+    <h3>Raw JSON</h3>
+    <pre id="raw"></pre>
+  </div>
+
 </div>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-const SCOPES=['https://www.googleapis.com/auth/youtube.readonly','https://www.googleapis.com/auth/yt-analytics.readonly'].join(' ');
-let tokenClient=null,accessToken=null,currentClientId='';
-let selectedTitle=null,selectedDescription=null;
+const SCOPES = [
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/yt-analytics.readonly'
+].join(' ');
 
+let tokenClient=null, accessToken=null, tokenExpiresAt=null, currentClientId='';
 const el=id=>document.getElementById(id);
+
+let selectedTitle=null, selectedDescription=null;
 
 el('authBtn').addEventListener('click',()=>{
   currentClientId=el('clientId').value.trim();
-  if(!currentClientId||currentClientId.startsWith('ENTER_')){alert('Paste your OAuth 2.0 Client ID');return;}
+  if(!currentClientId||currentClientId.startsWith('ENTER_')){alert('Enter OAuth Client ID');return;}
   initTokenClient(currentClientId);
   tokenClient.requestAccessToken({prompt:'consent'});
 });
 
-el('signoutBtn').addEventListener('click',()=>{
-  accessToken=null;
-  window.localStorage.removeItem('yt_aud_token');
-  updateAuthUI();
-  el('warnings').textContent='Signed out locally.';
-});
+el('signoutBtn').addEventListener('click',()=>{accessToken=null;tokenExpiresAt=null;window.localStorage.removeItem('yt_aud_token');updateAuthUI();el('warnings').textContent='Signed out';});
 
-function updateAuthUI(){el('authStatus').innerHTML=accessToken?'Signed in — token active':'Not signed in / token expired';}
+function updateAuthUI(){el('authStatus').innerHTML=(accessToken&&tokenExpiresAt&&Date.now()<tokenExpiresAt)?'Signed in — token valid until '+new Date(tokenExpiresAt).toLocaleString():'Not signed in / token expired';}
+
 function initTokenClient(clientId){
   if(tokenClient&&currentClientId===clientId)return;
   tokenClient=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:SCOPES,callback:resp=>{
     if(resp.error){el('warnings').textContent='Token error: '+(resp.error_description||resp.error);return;}
     accessToken=resp.access_token;
-    window.localStorage.setItem('yt_aud_token',JSON.stringify({token:accessToken}));
+    tokenExpiresAt=Date.now()+(resp.expires_in?resp.expires_in*1000:(60*60*1000));
+    window.localStorage.setItem('yt_aud_token',JSON.stringify({token:accessToken,expiresAt:tokenExpiresAt}));
     updateAuthUI();
-    el('warnings').textContent='Access token acquired.';
-  }});
+    el('warnings').textContent='Access token acquired.';}});
 }
 
-(function restoreToken(){try{const saved=JSON.parse(window.localStorage.getItem('yt_aud_token')||'null');if(saved&&saved.token){accessToken=saved.token;updateAuthUI();}}catch(e){}})();
+(function restoreToken(){try{const saved=JSON.parse(window.localStorage.getItem('yt_aud_token')||'null');if(saved&&saved.token&&saved.expiresAt&&Date.now()<saved.expiresAt){accessToken=saved.token;tokenExpiresAt=saved.expiresAt;updateAuthUI();}}catch(e){};})();
 
-function extractVideoId(input){
-  if(!input)return null;input=input.trim();
-  const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;
-  const m=input.match(re);if(m)return m[1];if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;return null;
-}
+function extractVideoId(input){if(!input)return null;input=input.trim();const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;const m=input.match(re);if(m)return m[1];if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;return null;}
 
 el('analyzeBtn').addEventListener('click',async()=>{
   el('warnings').textContent='';el('results').style.display='none';
-  const vid=extractVideoId(el('videoInput').value.trim());
-  if(!vid){el('warnings').textContent='Invalid YouTube link or ID.';return;}
-  if(!accessToken){el('warnings').textContent='No access token. Click sign in.';return;}
+  const raw=el('videoInput').value.trim();
+  const vid=extractVideoId(raw);if(!vid){el('warnings').textContent='Invalid video ID';return;}
+  if(!accessToken){el('warnings').textContent='No access token';return;}
   try{
     const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}`;
-    const metaResp=await fetchWithAuth(videoUrl);if(!metaResp.ok)throw new Error('videos.list failed');const metaJson=await metaResp.json();
-    if(!metaJson.items||metaJson.items.length===0){el('warnings').textContent='Video not found.';return;}
+    const metaResp=await fetchWithAuth(videoUrl);
+    if(!metaResp.ok)throw new Error('videos.list failed: '+metaResp.status);
+    const metaJson=await metaResp.json();if(!metaJson.items||metaJson.items.length===0){el('warnings').textContent='Video not found';return;}
     const item=metaJson.items[0];
 
-    // Analytics (last 90 days)
     const end=new Date(),start=new Date();start.setDate(end.getDate()-90);
     const startStr=start.toISOString().slice(0,10),endStr=end.toISOString().slice(0,10);
-    const metrics=encodeURIComponent('views,averageViewDuration,averageViewPercentage,estimatedMinutesWatched,clickThroughRate');
+    const metrics=encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage');
     const filters=encodeURIComponent(`video==${vid}`),ids=encodeURIComponent('channel==MINE');
-    const analyticsUrl=`https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
+    const analyticsUrl=`https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
     const analyticsResp=await fetchWithAuth(analyticsUrl);
     const analyticsJson=analyticsResp.ok?await analyticsResp.json():{error:await analyticsResp.text()};
 
@@ -155,20 +157,20 @@ el('analyzeBtn').addEventListener('click',async()=>{
   }catch(err){console.error(err);el('warnings').textContent='Error: '+(err.message||err);}
 });
 
-el('clearBtn').addEventListener('click',()=>{el('videoInput').value='';el('results').style.display='none';el('warnings').textContent='';el('raw').textContent='';el('titles').innerHTML='';el('descriptions').innerHTML='';el('hashtags').innerHTML='';el('prediction').innerHTML='';selectedTitle=null;selectedDescription=null;});
+el('clearBtn').addEventListener('click',()=>{el('videoInput').value='';el('results').style.display='none';el('warnings').textContent='';el('raw').textContent='';el('titles').innerHTML='';el('descriptions').innerHTML='';el('prediction').innerHTML='';selectedTitle=null;selectedDescription=null;});
 
 async function fetchWithAuth(url){return fetch(url,{headers:{Authorization:'Bearer '+accessToken}});}
 
 function renderResults(metaItem,analyticsJson,meta){
   el('results').style.display='block';
   const snip=metaItem.snippet||{},stats=metaItem.statistics||{},contentDetails=metaItem.contentDetails||{};
-  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
+  const isShort=isShortDuration(contentDetails.duration);
+  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
   const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
   el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div><div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div><div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
   let analyticsHtml='';
   if(analyticsJson&&analyticsJson.rows&&analyticsJson.rows.length>0){
-    const row=analyticsJson.rows[0];
-    const metrics=analyticsJson.columnHeaders?analyticsJson.columnHeaders.map(h=>h.name):[];
+    const row=analyticsJson.rows[0];const metrics=analyticsJson.columnHeaders?analyticsJson.columnHeaders.map(h=>h.name):[];
     const map={};for(let i=0;i<metrics.length;i++)map[metrics[i]]=row[i];
     analyticsHtml+=`<div><strong>Views:</strong> ${map.views||0}</div><div><strong>Avg View Duration (s):</strong> ${map.averageViewDuration||0}</div><div><strong>Avg View %:</strong> ${map.averageViewPercentage||0}</div><div><strong>Est. Minutes Watched:</strong> ${map.estimatedMinutesWatched||0}</div>`;
   }else if(analyticsJson&&analyticsJson.error){analyticsHtml+=`<div class="err">Analytics error: ${escapeHtml(typeof analyticsJson.error==='string'?analyticsJson.error:JSON.stringify(analyticsJson.error))}</div>`;}
@@ -184,14 +186,14 @@ async function generateTrendBasedSuggestions(originalTitle){
   const searchJson=await searchResp.json();const videos=searchJson.items||[];
   let trendTitles=[],trendDescriptions=[],trendTags=[];
   for(let v of videos){trendTitles.push(v.snippet.title);trendDescriptions.push(v.snippet.description.slice(0,200));if(v.snippet.tags)trendTags.push(...v.snippet.tags);}
-  const revampedTitles=trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t;return t2;}).slice(0,5);
-  const revampedDescriptions=trendDescriptions.map(d=>d).slice(0,3);
+  const revampedTitles=trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t;return t2.replace(/\b(Roblox|TSB)\b/gi,m=>m.toUpperCase());}).slice(0,5);
+  const revampedDescriptions=trendDescriptions.map(d=>`🔥 ${d} Watch till the end for epic TSB action!`).slice(0,3);
   let hashtags=[...new Set([...trendTags,...originalTitle.split(/\s+/)])].slice(0,15).map(h=>`#${h.replace(/\W/g,'')}`);
   return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags};
 }
 
 function renderSuggestions(suggestions){
-  el('titles').innerHTML='';el('descriptions').innerHTML='';el('hashtags').innerHTML='';
+  el('titles').innerHTML='';el('descriptions').innerHTML='';
   suggestions.titles.forEach(t=>{
     const btn=document.createElement('button');btn.textContent=t;btn.className='btn-inline';
     btn.onclick=()=>{selectedTitle=t;updatePrediction();updateButtons(el('titles'),btn);};
@@ -208,27 +210,33 @@ function renderSuggestions(suggestions){
 // ---------------- Prediction ----------------
 async function updatePrediction(){
   if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.';return;}
+  // simulate prediction using trending metrics (simplified)
   el('prediction').innerHTML='Calculating...';
   const query=encodeURIComponent(selectedTitle); 
   const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
   const searchResp=await fetchWithAuth(searchUrl);
   const searchJson=await searchResp.json();const videos=searchJson.items||[];
-  let avgViews=0,avgWatch=0,count=0;
-  for(let v of videos){if(!v.id.videoId)continue;
+  let avgViews=0,avgCTR=0,avgWatch=0;let count=0;
+  for(let v of videos){
+    if(!v.id.videoId)continue;
     const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${v.id.videoId}`;
     const resp=await fetchWithAuth(videoUrl);const json=await resp.json();if(!json.items||!json.items[0])continue;
     const stats=json.items[0].statistics||{};const dur=json.items[0].contentDetails.duration||'PT0S';
-    const duration=parseISO8601(dur);avgViews+=parseInt(stats.viewCount||0);avgWatch+=duration*0.5;count++;
+    const duration=parseISO8601(dur);
+    avgViews+=parseInt(stats.viewCount||0);avgCTR+=0.1;avgWatch+=duration*0.5;count++;
   }
-  if(count>0){avgViews=Math.round(avgViews/count);avgWatch=Math.round(avgWatch/count);}
-  el('prediction').innerHTML=`<table><tr><th>Timeframe</th><th>Predicted Views</th><th>Predicted Avg Watch (s)</th></tr>
-<tr><td>1 Day</td><td>${Math.round(avgViews/30)}</td><td>${Math.round(avgWatch/30)}</td></tr>
-<tr><td>1 Month</td><td>${avgViews}</td><td>${avgWatch}</td></tr>
-<tr><td>1 Year</td><td>${avgViews*12}</td><td>${avgWatch*12}</td></tr></table>`;
+  if(count>0){avgViews=Math.round(avgViews/count);avgWatch=Math.round(avgWatch/count);avgCTR=(avgCTR/count*100).toFixed(2);}
+  el('prediction').innerHTML=`<table><tr><th>Timeframe</th><th>Predicted Views</th><th>Predicted CTR</th><th>Predicted Avg Watch (s)</th></tr>
+  <tr><td>1 Day</td><td>${Math.round(avgViews/30)}</td><td>${avgCTR}%</td><td>${Math.round(avgWatch/30)}</td></tr>
+  <tr><td>1 Month</td><td>${avgViews}</td><td>${avgCTR}%</td><td>${avgWatch}</td></tr>
+  <tr><td>1 Year</td><td>${avgViews*12}</td><td>${avgCTR}%</td><td>${avgWatch*12}</td></tr></table>`;
 }
 
+// helper for ISO8601 duration
 function parseISO8601(dur){const m=dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);if(!m)return 0;return(parseInt(m[1]||0)*3600+parseInt(m[2]||0)*60+parseInt(m[3]||0));}
+
 function updateButtons(container,selectedBtn){Array.from(container.children).forEach(b=>b.classList.remove('btn-selected'));selectedBtn.classList.add('btn-selected');}
+function isShortDuration(iso){if(!iso)return false;const m=iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);if(!m)return false;const h=parseInt(m[1]||0),mm=parseInt(m[2]||0),s=parseInt(m[3]||0);return h*3600+mm*60+s<=60;}
 function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
 </body>
