@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>YouTube Data + Analytics Audit (Single HTML)</title>
+<title>YouTube Trend-Based Optimizer + Analytics</title>
 <style>
 :root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
 body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
@@ -20,33 +20,29 @@ img.thumb{max-width:320px;border-radius:8px;margin-top:8px}
 pre{background:#0b1220;color:#e6eef6;padding:10px;border-radius:8px;overflow:auto}
 .btn-inline{display:inline-block;padding:8px 12px;border-radius:8px;background:#0ea5a9;color:white;border:none;cursor:pointer}
 .small{font-size:13px;color:var(--muted)}
+ul{margin:4px 0;padding-left:20px}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>YouTube Data + Analytics Audit (Shorts & Videos)</h1>
+<h1>YouTube Trend-Based Optimizer + Analytics</h1>
+
 <div class="card">
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <div style="flex:1;min-width:220px">
-      <label>OAuth Client ID (replace the placeholder)</label>
+      <label>OAuth Client ID</label>
       <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
-      <div class="small">Create one in Google Cloud Console → Credentials → OAuth 2.0 Client IDs (type: Web application). Add this page origin to Authorized JavaScript origins.</div>
+      <div class="small">Google Cloud → OAuth 2.0 Client ID (Web app). Add this page origin as Authorized JS origin.</div>
     </div>
-    <div style="min-width:220px">
-      <label>&nbsp;</label>
-      <button id="authBtn" class="btn-inline">Sign in / Grant Access</button>
-    </div>
-    <div style="min-width:220px">
-      <label>&nbsp;</label>
-      <button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button>
-    </div>
+    <div style="min-width:220px"><label>&nbsp;</label><button id="authBtn" class="btn-inline">Sign in / Grant Access</button></div>
+    <div style="min-width:220px"><label>&nbsp;</label><button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button></div>
   </div>
   <div id="authStatus" class="small muted" style="margin-top:8px">Not signed in</div>
 </div>
 
 <div class="card">
   <label>Video URL or ID</label>
-  <input id="videoInput" placeholder="https://youtu.be/XXXXX or https://youtube.com/shorts/XXXXX or video id" />
+  <input id="videoInput" placeholder="https://youtu.be/XXXXX or /shorts/XXXXX or video id" />
   <div class="row" style="margin-top:10px">
     <div class="col"><button id="analyzeBtn" class="btn-inline">Analyze</button></div>
     <div class="col"><button id="clearBtn" class="btn-inline" style="background:#6b7280">Clear</button></div>
@@ -55,40 +51,43 @@ pre{background:#0b1220;color:#e6eef6;padding:10px;border-radius:8px;overflow:aut
 </div>
 
 <div id="results" style="display:none">
+
   <div class="card">
     <h3>Summary</h3>
     <div id="summary"></div>
   </div>
 
   <div class="card">
-    <h3>Metadata (Data API)</h3>
+    <h3>Metadata</h3>
     <div id="meta"></div>
   </div>
 
   <div class="card">
-    <h3>Analytics (YouTube Analytics API)</h3>
+    <h3>Analytics</h3>
     <div id="analytics"></div>
   </div>
 
   <div class="card">
-    <h3>Actionable Suggestions</h3>
-    <div id="actionable"></div>
+    <h3>Suggested Titles</h3>
+    <div id="titles"></div>
   </div>
 
   <div class="card">
-    <h3>Raw JSON (for debugging)</h3>
+    <h3>Suggested Descriptions</h3>
+    <div id="descriptions"></div>
+  </div>
+
+  <div class="card">
+    <h3>Suggested Hashtags</h3>
+    <div id="hashtags"></div>
+  </div>
+
+  <div class="card">
+    <h3>Raw JSON</h3>
     <pre id="raw"></pre>
   </div>
 </div>
 
-<div class="card small muted" style="margin-top:18px">
-  <strong>Notes:</strong>
-  <ul>
-    <li>This page uses <code>google.accounts.oauth2.initTokenClient</code> (Google Identity Services) to get an access token in-browser. You will be asked to consent to scopes for YouTube Data & Analytics.</li>
-    <li>The token allows calls to <code>youtube/v3</code> and <code>youtubeAnalytics/v2</code>. For production or public apps, use a server-side flow.</li>
-    <li>If you get CORS or origin errors, ensure the origin (protocol+host+port) is added to your OAuth client's Authorized JavaScript origins.</li>
-  </ul>
-</div>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -105,11 +104,14 @@ let currentClientId = '';
 
 const el = id => document.getElementById(id);
 
-el('authBtn').addEventListener('click', async () => {
+el('authBtn').addEventListener('click', () => {
   currentClientId = el('clientId').value.trim();
-  if(!currentClientId || currentClientId.startsWith('ENTER_')) { alert('Please paste your OAuth 2.0 Client ID.'); return; }
+  if (!currentClientId || currentClientId.startsWith('ENTER_')) {
+    alert('Enter OAuth Client ID');
+    return;
+  }
   initTokenClient(currentClientId);
-  tokenClient.requestAccessToken({prompt: 'consent'});
+  tokenClient.requestAccessToken({ prompt: 'consent' });
 });
 
 el('signoutBtn').addEventListener('click', () => {
@@ -117,26 +119,30 @@ el('signoutBtn').addEventListener('click', () => {
   tokenExpiresAt = null;
   window.localStorage.removeItem('yt_aud_token');
   updateAuthUI();
-  el('warnings').textContent = 'Signed out locally.';
+  el('warnings').textContent = 'Signed out';
 });
 
 function updateAuthUI() {
-  if(accessToken && tokenExpiresAt && Date.now() < tokenExpiresAt)
+  if (accessToken && tokenExpiresAt && Date.now() < tokenExpiresAt) {
     el('authStatus').innerHTML = 'Signed in — token valid until ' + new Date(tokenExpiresAt).toLocaleString();
-  else
+  } else {
     el('authStatus').innerHTML = 'Not signed in / token expired';
+  }
 }
 
 function initTokenClient(clientId) {
-  if(tokenClient && currentClientId === clientId) return;
+  if (tokenClient && currentClientId === clientId) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: SCOPES,
     callback: (resp) => {
-      if(resp.error) { el('warnings').textContent = 'Token error: ' + (resp.error_description || resp.error); return; }
+      if (resp.error) {
+        el('warnings').textContent = 'Token error: ' + (resp.error_description || resp.error);
+        return;
+      }
       accessToken = resp.access_token;
-      tokenExpiresAt = Date.now() + (resp.expires_in ? resp.expires_in*1000 : (60*60*1000));
-      window.localStorage.setItem('yt_aud_token', JSON.stringify({token: accessToken, expiresAt: tokenExpiresAt}));
+      tokenExpiresAt = Date.now() + (resp.expires_in ? resp.expires_in * 1000 : (60 * 60 * 1000));
+      window.localStorage.setItem('yt_aud_token', JSON.stringify({ token: accessToken, expiresAt: tokenExpiresAt }));
       updateAuthUI();
       el('warnings').textContent = 'Access token acquired.';
     }
@@ -145,22 +151,22 @@ function initTokenClient(clientId) {
 
 (function restoreToken() {
   try {
-    const saved = JSON.parse(window.localStorage.getItem('yt_aud_token')||'null');
-    if(saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
+    const saved = JSON.parse(window.localStorage.getItem('yt_aud_token') || 'null');
+    if (saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
       accessToken = saved.token;
       tokenExpiresAt = saved.expiresAt;
       updateAuthUI();
     }
-  } catch(e){}
+  } catch (e) { }
 })();
 
-function extractVideoId(input){
-  if(!input) return null;
+function extractVideoId(input) {
+  if (!input) return null;
   input = input.trim();
-  const re = /(?:v=|\/videos\/|embed\/|youtu\\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;
+  const re = /(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;
   const m = input.match(re);
-  if(m) return m[1];
-  if(/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
+  if (m) return m[1];
+  if (/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
   return null;
 }
 
@@ -169,136 +175,81 @@ el('analyzeBtn').addEventListener('click', async () => {
   el('results').style.display = 'none';
   const raw = el('videoInput').value.trim();
   const vid = extractVideoId(raw);
-  if(!vid) { el('warnings').textContent = 'Invalid YouTube link or ID.'; return; }
-  if(!accessToken) { el('warnings').textContent = 'No access token. Click "Sign in / Grant Access".'; return; }
-
+  if (!vid) { el('warnings').textContent = 'Invalid video ID'; return; }
+  if (!accessToken) { el('warnings').textContent = 'No access token'; return; }
   try {
     const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}`;
     const metaResp = await fetchWithAuth(videoUrl);
-    if(!metaResp.ok) throw new Error('videos.list failed: ' + metaResp.status);
+    if (!metaResp.ok) throw new Error('videos.list failed: ' + metaResp.status);
     const metaJson = await metaResp.json();
-    if(!metaJson.items || metaJson.items.length===0) { el('warnings').textContent = 'Video not found or not accessible.'; return; }
+    if (!metaJson.items || metaJson.items.length === 0) { el('warnings').textContent = 'Video not found'; return; }
     const item = metaJson.items[0];
 
-    const end = new Date();
-    const start = new Date(); start.setDate(end.getDate() - 90);
-    const startStr = start.toISOString().slice(0,10);
-    const endStr = end.toISOString().slice(0,10);
-
+    // Analytics
+    const end = new Date(), start = new Date(); start.setDate(end.getDate() - 90);
+    const startStr = start.toISOString().slice(0, 10), endStr = end.toISOString().slice(0, 10);
     const metrics = encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage');
-    const filters = encodeURIComponent(`video==${vid}`);
-    const ids = encodeURIComponent('channel==MINE');
+    const filters = encodeURIComponent(`video==${vid}`), ids = encodeURIComponent('channel==MINE');
     const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
     const analyticsResp = await fetchWithAuth(analyticsUrl);
-    const analyticsJson = analyticsResp.ok ? await analyticsResp.json() : {error: await analyticsResp.text()};
+    const analyticsJson = analyticsResp.ok ? await analyticsResp.json() : { error: await analyticsResp.text() };
 
-    renderResults(item, analyticsJson, {startDate:startStr,endDate:endStr});
-    el('raw').textContent = JSON.stringify({meta:metaJson, analytics:analyticsJson}, null, 2);
-  } catch(err) {
-    console.error(err);
-    el('warnings').textContent = 'Error: ' + (err.message || err);
-  }
+    // Render
+    renderResults(item, analyticsJson, { startDate: startStr, endDate: endStr });
+    // Trend-based suggestions
+    const suggestions = await generateTrendBasedSuggestions(item.snippet.title);
+    el('titles').innerHTML = suggestions.titles.map(t => `<div>• ${escapeHtml(t)}</div>`).join('');
+    el('descriptions').innerHTML = suggestions.descriptions.map(d => `<div>• ${escapeHtml(d)}</div>`).join('');
+    el('hashtags').innerHTML = suggestions.hashtags.map(h => `<span style="margin:3px;">${h}</span>`).join('');
+    el('raw').textContent = JSON.stringify({ meta: metaJson, analytics: analyticsJson }, null, 2);
+  } catch (err) { console.error(err); el('warnings').textContent = 'Error: ' + (err.message || err); }
 });
 
-el('clearBtn').addEventListener('click', ()=> {
-  el('videoInput').value = '';
-  el('results').style.display = 'none';
-  el('warnings').textContent = '';
-  el('raw').textContent = '';
-});
+el('clearBtn').addEventListener('click', () => { el('videoInput').value = ''; el('results').style.display = 'none'; el('warnings').textContent = ''; el('raw').textContent = ''; });
 
-async function fetchWithAuth(url) { return fetch(url, { headers: { Authorization: 'Bearer ' + accessToken }}); }
+async function fetchWithAuth(url) { return fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } }); }
 
+// ---------------- Render Results ----------------
 function renderResults(metaItem, analyticsJson, meta) {
   el('results').style.display = 'block';
-  const snip = metaItem.snippet || {};
-  const stats = metaItem.statistics || {};
-  const contentDetails = metaItem.contentDetails || {};
+  const snip = metaItem.snippet || {}, stats = metaItem.statistics || {}, contentDetails = metaItem.contentDetails || {};
   const isShort = isShortDuration(contentDetails.duration);
 
-  el('summary').innerHTML = `
-    <strong>Title:</strong> ${escapeHtml(snip.title||'')}<br>
-    <strong>Video ID:</strong> ${metaItem.id}<br>
-    <strong>Type:</strong> ${isShort ? '<span class="ok">Short (<=60s)</span>' : 'Regular video'}<br>
-    <strong>Analyzed date range:</strong> ${meta.startDate} → ${meta.endDate}
-  `;
+  el('summary').innerHTML = `<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
 
-  const thumb = (snip.thumbnails && (snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
-  el('meta').innerHTML = `
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <div style="flex:1;min-width:240px">
-        <strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br>
-        <strong>Description (first 200 chars)</strong><br>${escapeHtml((snip.description||'').slice(0,200))}${(snip.description||'').length>200?'...':''}
-      </div>
-      <div style="min-width:320px">
-        <strong>Thumbnail</strong><br>
-        ${thumb ? `<img class="thumb" src="${thumb.url}" alt="thumb">` : '<div class="warn">No thumbnail</div>'}
-      </div>
-    </div>
-    <div style="margin-top:12px"><strong>Stats (public):</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>
-    <div style="margin-top:8px"><strong>Tags:</strong> ${(snip.tags||[]).slice(0,20).map(t=>'<span style="display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;margin:4px;margin-right:6px">'+escapeHtml(t)+'</span>').join('')}</div>
-  `;
+  const thumb = (snip.thumbnails && (snip.thumbnails.maxres || snip.thumbnails.high || snip.thumbnails.medium || snip.thumbnails.default));
+  el('meta').innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description (first 200 chars)</strong><br>${escapeHtml((snip.description||'').slice(0,200))}${(snip.description||'').length>200?'...':''}</div><div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div><div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
 
+  // Analytics
   let analyticsHtml = '';
-  if(analyticsJson && analyticsJson.rows && analyticsJson.rows.length>0) {
+  if (analyticsJson && analyticsJson.rows && analyticsJson.rows.length > 0) {
     const row = analyticsJson.rows[0];
-    const metrics = analyticsJson.columnHeaders ? analyticsJson.columnHeaders.map(h=>h.name) : ['views','estimatedMinutesWatched','averageViewDuration','averageViewPercentage'];
-    const map = {}; for(let i=0;i<metrics.length;i++) map[metrics[i]] = row[i];
-
-    analyticsHtml += `<div><strong>Views:</strong> ${map.views || 0}</div>`;
-    analyticsHtml += `<div><strong>Estimated minutes watched:</strong> ${map.estimatedMinutesWatched || 0}</div>`;
-    analyticsHtml += `<div><strong>Average view duration (s):</strong> ${map.averageViewDuration ? Number(map.averageViewDuration).toFixed(1) : 'N/A'}</div>`;
-    analyticsHtml += `<div><strong>Average view %:</strong> ${map.averageViewPercentage ? Number(map.averageViewPercentage).toFixed(1) + '%' : 'N/A'}</div>`;
-  } else if(analyticsJson && analyticsJson.error) {
+    const metrics = analyticsJson.columnHeaders ? analyticsJson.columnHeaders.map(h => h.name) : [];
+    const map = {}; for (let i = 0; i < metrics.length; i++) map[metrics[i]] = row[i];
+    analyticsHtml += `<div><strong>Views:</strong> ${map.views||0}</div><div><strong>Avg View Duration (s):</strong> ${map.averageViewDuration||0}</div><div><strong>Avg View %:</strong> ${map.averageViewPercentage||0}</div><div><strong>Est. Minutes Watched:</strong> ${map.estimatedMinutesWatched||0}</div>`;
+  } else if (analyticsJson && analyticsJson.error) {
     analyticsHtml += `<div class="err">Analytics error: ${escapeHtml(typeof analyticsJson.error==='string'?analyticsJson.error:JSON.stringify(analyticsJson.error))}</div>`;
-  } else {
-    analyticsHtml += `<div class="warn">No analytics rows returned.</div>`;
-  }
+  } else { analyticsHtml += `<div class="warn">No analytics data returned.</div>`; }
   el('analytics').innerHTML = analyticsHtml;
-
-  // Title / description / thumbnail feedback
-  const title = snip.title||'';
-  let titleSuggestions = '';
-  if(title.length<40) titleSuggestions += '<li>Title too short (<40 chars) — add main keywords early.</li>';
-  if(title.length>70) titleSuggestions += '<li>Title too long (>70 chars) — shorten for search display.</li>';
-  if(!/TSB/i.test(title)) titleSuggestions += '<li>Add keyword "TSB" for better search relevance.</li>';
-
-  const desc = snip.description||'';
-  let descSuggestions = '';
-  const firstLine = desc.split('\n')[0]||'';
-  if(firstLine.length<50) descSuggestions += '<li>First line of description is short — add keywords + CTA.</li>';
-  if(firstLine.length>200) descSuggestions += '<li>First line too long — important info may be cut in search snippet.</li>';
-
-  let thumbSuggestions = '';
-  if(thumb) {
-    const aspect = (thumb.width/thumb.height).toFixed(2);
-    if(aspect<1.7||aspect>1.9) thumbSuggestions += '<li>Thumbnail aspect ratio not ~16:9 — may crop in search results.</li>';
-    if(thumb.width<640||thumb.height<360) thumbSuggestions += '<li>Thumbnail resolution is low — use at least 1280x720.</li>';
-  } else thumbSuggestions += '<li>No thumbnail detected — add a custom image.</li>';
-
-  let actions = '<ul>';
-  actions += titleSuggestions || '<li>Title looks good ✅</li>';
-  actions += descSuggestions || '<li>Description looks good ✅</li>';
-  actions += thumbSuggestions || '<li>Thumbnail looks good ✅</li>';
-  if(isShort) {
-    actions += '<li>Shorts tips: hook in first 3s, vertical 9:16, bold caption, trending audio, tight length 6–20s.</li>';
-  } else {
-    actions += '<li>Regular video tips: strong intro, descriptive first lines, pinned comment CTA, bold thumbnail text.</li>';
-  }
-  actions += '<li>Include 8–15 relevant tags including main keywords & long-tail variations.</li>';
-  actions += '</ul>';
-  el('actionable').innerHTML = actions;
 }
 
-function isShortDuration(iso) {
-  if(!iso) return false;
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if(!m) return false;
-  const h = parseInt(m[1]||0), mm=parseInt(m[2]||0), s=parseInt(m[3]||0);
-  const total = h*3600 + mm*60 + s;
-  return total <= 60;
+// ---------------- Trend-Based Title/Description/Hashtags ----------------
+async function generateTrendBasedSuggestions(originalTitle) {
+  if(!originalTitle) return {titles:[],descriptions:[],hashtags:[]};
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(originalTitle)}&order=viewCount`;
+  const searchResp = await fetchWithAuth(searchUrl);
+  if(!searchResp.ok) return {titles:[],descriptions:[],hashtags:[]};
+  const searchJson = await searchResp.json();
+  const videos = searchJson.items || [];
+  let trendTitles=[], trendDescriptions=[], trendTags=[];
+  for(let v of videos){ trendTitles.push(v.snippet.title); trendDescriptions.push(v.snippet.description.slice(0,200)); if(v.snippet.tags) trendTags.push(...v.snippet.tags);}
+  const revampedTitles = trendTitles.map(t=>{let t2=t.length>60?t.slice(0,57)+'...':t; return t2.replace(/\b(Roblox|TSB)\b/gi,m=>m.toUpperCase());}).slice(0,5);
+  const revampedDescriptions = trendDescriptions.map(d=>`🔥 ${d} Watch till the end for epic TSB action!`).slice(0,3);
+  let hashtags = [...new Set([...trendTags,...originalTitle.split(/\s+/)])].slice(0,15).map(h=>`#${h.replace(/\W/g,'')}`);
+  return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags};
 }
 
+function isShortDuration(iso){if(!iso)return false;const m=iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);if(!m)return false;const h=parseInt(m[1]||0),mm=parseInt(m[2]||0),s=parseInt(m[3]||0);return h*3600+mm*60+s<=60;}
 function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
 </body>
