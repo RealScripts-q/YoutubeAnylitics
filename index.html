@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YouTube Data + Analytics Audit (Single HTML)</title>
+  <style>
+    :root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
+    .wrap{max-width:980px;margin:12px auto}
+    h1{font-size:20px;margin:6px 0}
+    label{display:block;margin-top:12px;font-weight:700;color:var(--muted)}
+    input,button,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6eef6;background:var(--card)}
+    .row{display:flex;gap:10px}
+    .col{flex:1}
+    .card{background:var(--card);padding:12px;border-radius:12px;border:1px solid #e6eef6;margin-top:12px}
+    .muted{color:var(--muted)}
+    .ok{color:green}.warn{color:orange}.err{color:red}
+    img.thumb{max-width:320px;border-radius:8px;margin-top:8px}
+    pre{background:#0b1220;color:#e6eef6;padding:10px;border-radius:8px;overflow:auto}
+    .btn-inline{display:inline-block;padding:8px 12px;border-radius:8px;background:#0ea5a9;color:white;border:none;cursor:pointer}
+    .small{font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>YouTube Data + Analytics Audit (Shorts & Videos)</h1>
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <label>OAuth Client ID (replace the placeholder)</label>
+          <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
+          <div class="small">Create one in Google Cloud Console → Credentials → OAuth 2.0 Client IDs (type: Web application). Add this page origin to Authorized JavaScript origins.</div>
+        </div>
+
+        <div style="min-width:220px">
+          <label>&nbsp;</label>
+          <button id="authBtn" class="btn-inline">Sign in / Grant Access</button>
+        </div>
+
+        <div style="min-width:220px">
+          <label>&nbsp;</label>
+          <button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button>
+        </div>
+      </div>
+
+      <div id="authStatus" class="small muted" style="margin-top:8px">Not signed in</div>
+    </div>
+
+    <div class="card">
+      <label>Video URL or ID</label>
+      <input id="videoInput" placeholder="https://youtu.be/XXXXX or https://youtube.com/shorts/XXXXX or video id" />
+      <div class="row" style="margin-top:10px">
+        <div class="col"><button id="analyzeBtn" class="btn-inline">Analyze</button></div>
+        <div class="col"><button id="clearBtn" class="btn-inline" style="background:#6b7280">Clear</button></div>
+      </div>
+
+      <div id="warnings" class="small muted" style="margin-top:8px"></div>
+    </div>
+
+    <div id="results" style="display:none">
+      <div class="card">
+        <h3>Summary</h3>
+        <div id="summary"></div>
+      </div>
+
+      <div class="card">
+        <h3>Metadata (Data API)</h3>
+        <div id="meta"></div>
+      </div>
+
+      <div class="card">
+        <h3>Analytics (YouTube Analytics API)</h3>
+        <div id="analytics"></div>
+      </div>
+
+      <div class="card">
+        <h3>Actionable Suggestions</h3>
+        <div id="actionable"></div>
+      </div>
+
+      <div class="card">
+        <h3>Raw JSON (for debugging)</h3>
+        <pre id="raw"></pre>
+      </div>
+    </div>
+
+    <div class="card small muted" style="margin-top:18px">
+      <strong>Notes:</strong>
+      <ul>
+        <li>This page uses <code>google.accounts.oauth2.initTokenClient</code> (Google Identity Services) to get an access token in-browser. You will be asked to consent to scopes for YouTube Data & Analytics.</li>
+        <li>The token allows calls to <code>youtube/v3</code> and <code>youtubeAnalytics/v2</code>. For production or public apps, use a server-side flow.</li>
+        <li>If you get CORS or origin errors, ensure the origin (protocol+host+port) is added to your OAuth client's Authorized JavaScript origins.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Load Google Identity Services (GSI) for token client -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script>
+  // ---------- CONFIG / SCOPE ----------
+  // Replace client id in input with your own. You must set proper Authorized JS origins in Cloud Console.
+  const SCOPES = [
+    'https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/yt-analytics.readonly'
+  ].join(' ');
+
+  let tokenClient = null;
+  let accessToken = null;
+  let tokenExpiresAt = null;
+  let currentClientId = '';
+
+  const el = id => document.getElementById(id);
+
+  // ---------- UI ----------
+  el('authBtn').addEventListener('click', async () => {
+    currentClientId = el('clientId').value.trim();
+    if(!currentClientId || currentClientId.startsWith('ENTER_')) {
+      alert('Please paste your OAuth 2.0 Client ID (Web application) into the Client ID field.');
+      return;
+    }
+    initTokenClient(currentClientId);
+    // Request token interactively
+    tokenClient.requestAccessToken({prompt: 'consent'});
+  });
+
+  el('signoutBtn').addEventListener('click', () => {
+    accessToken = null;
+    tokenExpiresAt = null;
+    window.localStorage.removeItem('yt_aud_token');
+    updateAuthUI();
+    el('warnings').textContent = 'Signed out locally. Page still has origin in your OAuth client settings.';
+  });
+
+  function updateAuthUI() {
+    if(accessToken && tokenExpiresAt && Date.now() < tokenExpiresAt) {
+      el('authStatus').innerHTML = 'Signed in — token valid until ' + new Date(tokenExpiresAt).toLocaleString();
+    } else {
+      el('authStatus').innerHTML = 'Not signed in / token expired';
+    }
+  }
+
+  function initTokenClient(clientId) {
+    if(tokenClient && currentClientId === clientId) return;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: (resp) => {
+        if(resp.error) {
+          console.error('Token error', resp);
+          el('warnings').textContent = 'Token error: ' + (resp.error_description || resp.error);
+          return;
+        }
+        accessToken = resp.access_token;
+        // tokens usually have expires_in seconds
+        tokenExpiresAt = Date.now() + (resp.expires_in ? resp.expires_in*1000 : (60*60*1000));
+        // persist short-term (optional)
+        window.localStorage.setItem('yt_aud_token', JSON.stringify({token: accessToken, expiresAt: tokenExpiresAt}));
+        updateAuthUI();
+        el('warnings').textContent = 'Access token acquired. You can now analyze videos (this session).';
+      }
+    });
+  }
+
+  // Try restore token from localStorage (if present & not expired)
+  (function restoreToken() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('yt_aud_token')||'null');
+      if(saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
+        accessToken = saved.token;
+        tokenExpiresAt = saved.expiresAt;
+        updateAuthUI();
+      }
+    } catch(e){}
+  })();
+
+  // ---------- Video ID extraction ----------
+  function extractVideoId(input){
+    if(!input) return null;
+    input = input.trim();
+    // common forms: youtu.be/ID, watch?v=ID, /shorts/ID, embed/ID
+    const re = /(?:v=|\/videos\/|embed\/|youtu\\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;
+    const m = input.match(re);
+    if(m) return m[1];
+    if(/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
+    return null;
+  }
+
+  // ---------- Button: Analyze ----------
+  el('analyzeBtn').addEventListener('click', async () => {
+    el('warnings').textContent = '';
+    el('results').style.display = 'none';
+    const raw = el('videoInput').value.trim();
+    const vid = extractVideoId(raw);
+    if(!vid) { el('warnings').textContent = 'Invalid YouTube link or ID.'; return; }
+
+    if(!accessToken) {
+      el('warnings').textContent = 'No access token. Click "Sign in / Grant Access" and allow the scopes.';
+      return;
+    }
+
+    try {
+      // 1) Fetch metadata (Data API) - videos.list
+      const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}`;
+      const metaResp = await fetchWithAuth(videoUrl);
+      if(!metaResp.ok) throw new Error('videos.list failed: ' + metaResp.status);
+      const metaJson = await metaResp.json();
+      if(!metaJson.items || metaJson.items.length===0) {
+        el('warnings').textContent = 'Video not found or not accessible.';
+        return;
+      }
+      const item = metaJson.items[0];
+
+      // 2) Fetch analytics (YouTube Analytics API v2 reports)
+      // We'll request a rolling window: last 90 days (or since upload if newer)
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - 90);
+      // but ensure start is not before 2005-02-14 (YouTube epoch) - not needed but safe
+      const startStr = start.toISOString().slice(0,10);
+      const endStr = end.toISOString().slice(0,10);
+
+      // Prepare metrics: views, impressions, averageViewDuration, averageViewPercentage, estimatedMinutesWatched, clickThroughRate
+      const metrics = encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,impressions,clickThroughRate');
+      const filters = encodeURIComponent(`video==${vid}`);
+      const ids = encodeURIComponent('channel==MINE');
+
+      const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
+      const analyticsResp = await fetchWithAuth(analyticsUrl);
+      const analyticsJson = analyticsResp.ok ? await analyticsResp.json() : {error: await analyticsResp.text()};
+
+      // 3) Render & analyze
+      renderResults(item, analyticsJson, {startDate:startStr,endDate:endStr});
+      el('raw').textContent = JSON.stringify({meta:metaJson, analytics:analyticsJson}, null, 2);
+    } catch(err) {
+      console.error(err);
+      el('warnings').textContent = 'Error: ' + (err.message || err);
+    }
+  });
+
+  el('clearBtn').addEventListener('click', ()=> {
+    el('videoInput').value = '';
+    el('results').style.display = 'none';
+    el('warnings').textContent = '';
+    el('raw').textContent = '';
+  });
+
+  // helper: fetch with Authorization header
+  async function fetchWithAuth(url) {
+    return fetch(url, { headers: { Authorization: 'Bearer ' + accessToken }});
+  }
+
+  // ---------- Render & Simple Audit Logic ----------
+  function renderResults(metaItem, analyticsJson, meta) {
+    el('results').style.display = 'block';
+    const snip = metaItem.snippet || {};
+    const stats = metaItem.statistics || {};
+    const contentDetails = metaItem.contentDetails || {};
+    // duration parsing (ISO 8601)
+    const isShort = isShortDuration(contentDetails.duration);
+
+    // Summary
+    el('summary').innerHTML = `
+      <strong>Title:</strong> ${escapeHtml(snip.title||'')}<br>
+      <strong>Video ID:</strong> ${metaItem.id}<br>
+      <strong>Type:</strong> ${isShort ? '<span class="ok">Short (<=60s)</span>' : 'Regular video'}<br>
+      <strong>Analyzed date range:</strong> ${meta.startDate} → ${meta.endDate}
+    `;
+
+    // Metadata block
+    const thumb = (snip.thumbnails && (snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
+    el('meta').innerHTML = `
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br>
+          <strong>Description (first 200 chars)</strong><br>${escapeHtml((snip.description||'').slice(0,200))}${(snip.description||'').length>200?'...':''}
+        </div>
+        <div style="min-width:320px">
+          <strong>Thumbnail</strong><br>
+          ${thumb ? `<img class="thumb" src="${thumb.url}" alt="thumb">` : '<div class="warn">No thumbnail</div>'}
+        </div>
+      </div>
+      <div style="margin-top:12px"><strong>Stats (public):</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>
+      <div style="margin-top:8px"><strong>Tags:</strong> ${(snip.tags||[]).slice(0,20).map(t=>'<span style="display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;margin:4px;margin-right:6px">'+escapeHtml(t)+'</span>').join('')}</div>
+    `;
+
+    // Analytics block
+    let analyticsHtml = '';
+    if(analyticsJson && analyticsJson.rows && analyticsJson.rows.length>0) {
+      const row = analyticsJson.rows[0]; // matches metrics order
+      const metrics = analyticsJson.columnHeaders ? analyticsJson.columnHeaders.map(h=>h.name) : ['views','estimatedMinutesWatched','averageViewDuration','averageViewPercentage','impressions','clickThroughRate'];
+      const map = {};
+      for(let i=0;i<metrics.length;i++) map[metrics[i]] = row[i];
+
+      analyticsHtml += `<div><strong>Views:</strong> ${map.views || 0}</div>`;
+      analyticsHtml += `<div><strong>Impressions:</strong> ${map.impressions || 0}</div>`;
+      analyticsHtml += `<div><strong>CTR (click-through rate):</strong> ${map.clickThroughRate || 'N/A'}</div>`;
+      analyticsHtml += `<div><strong>Average view duration (s):</strong> ${map.averageViewDuration ? Number(map.averageViewDuration).toFixed(1) : 'N/A'}</div>`;
+      analyticsHtml += `<div><strong>Average view %:</strong> ${map.averageViewPercentage ? Number(map.averageViewPercentage).toFixed(1) + '%' : 'N/A'}</div>`;
+      analyticsHtml += `<div><strong>Estimated minutes watched:</strong> ${map.estimatedMinutesWatched || 0}</div>`;
+
+      // Simple heuristics
+      analyticsHtml += `<hr>`;
+      // CTR heuristic
+      const ctr = parseFloat(map.clickThroughRate) || 0;
+      if(ctr===0) analyticsHtml += `<div class="warn">CTR is 0 or unavailable — check thumbnail & title.</div>`;
+      else if(ctr < 0.02) analyticsHtml += `<div class="warn">CTR < 2% — thumbnail/title probably needs improvement.</div>`;
+      else analyticsHtml += `<div class="ok">CTR looks decent (${(ctr*100).toFixed(2)}%).</div>`;
+
+      const avgPct = parseFloat(map.averageViewPercentage) || 0;
+      if(avgPct && avgPct < 30) analyticsHtml += `<div class="warn">Average view % is low (&lt;30%). For Shorts, aim high retention in first 1-3s; for long videos, hook viewers in the intro.</div>`;
+      else if(avgPct) analyticsHtml += `<div class="ok">Average view % looks healthy (${avgPct.toFixed(1)}%).</div>`;
+
+    } else if(analyticsJson && analyticsJson.error) {
+      analyticsHtml += `<div class="err">Analytics error: ${escapeHtml(typeof analyticsJson.error==='string'?analyticsJson.error:JSON.stringify(analyticsJson.error))}</div>`;
+    } else {
+      analyticsHtml += `<div class="warn">No analytics rows returned. Ensure your OAuth consent includes the channel owner and that the channel has data for this period.</div>`;
+    }
+    el('analytics').innerHTML = analyticsHtml;
+
+    // Actionable checklist tailored to shorts vs videos
+    let actions = '<ul>';
+    if(isShort) {
+      actions += '<li><strong>Shorts tips:</strong> Hook in the first 0.3–1s, use vertical 9:16, bold caption text overlaid, and trending sound. Aim for CTR & high retention in first 3s.</li>';
+      actions += '<li>Use thumbnails that display well as a tiny square in feeds (9:16 cropping can show center). Include “FAST 1v1” style text.</li>';
+      actions += '<li>Keep length tight (6–20s). Rewatch loops help algorithm: aim for replays.</li>';
+    } else {
+      actions += '<li><strong>Regular video tips:</strong> Strong intro (first 5–15s), chapters, descriptive first lines in description with keywords, and pinned comment with CTA.</li>';
+      actions += '<li>Create an eye-catching 1280×720 thumbnail with bold short text and a focal subject.</li>';
+    }
+    actions += '<li>Title: include exact keywords like "TSB", "Roblox", "The Strongest Battlegrounds" near the start; keep title ~40–70 chars for best display.</li>';
+    actions += '<li>Description: first 1-2 lines show in search — include CTA & keywords, plus links/timestamps for longer videos.</li>';
+    actions += '<li>Tags: include 8–15 tags: exact phrases and long-tail variations ("TSB", "Roblox TSB", "fastest duel", "1v1").</li>';
+    actions += '<li>Test alternate thumbnails & titles — small A/B tests often boost CTR.</li>';
+    actions += '</ul>';
+    el('actionable').innerHTML = actions;
+  }
+
+  // ---------- Helpers ----------
+  function isShortDuration(iso) {
+    if(!iso) return false;
+    // parse PT#M#S or PT#S
+    const m = iso.match(/PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?/);
+    if(!m) return false;
+    const h = parseInt(m[1]||0), mm = parseInt(m[2]||0), s = parseInt(m[3]||0);
+    const total = h*3600 + mm*60 + s;
+    return total <= 60;
+  }
+
+  function escapeHtml(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  </script>
+</body>
+</html>
