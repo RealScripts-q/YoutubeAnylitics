@@ -187,16 +187,21 @@ el('analyzeBtn').addEventListener('click',async()=>{
 
     const end=new Date(), start=new Date(); start.setDate(end.getDate()-90);
     const startStr=start.toISOString().slice(0,10), endStr=end.toISOString().slice(0,10);
-    const metrics=encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,insightTrafficSourceType,country');
-    const filters=encodeURIComponent(`video==${vid}`), ids=encodeURIComponent('channel==MINE');
-    const analyticsUrl=`https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=insightTrafficSourceType,country&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
-    const analyticsResp=await fetchWithAuth(analyticsUrl);
-    const analyticsJson=analyticsResp.ok?await analyticsResp.json():{error:await analyticsResp.text()};
 
-    renderResults(item,analyticsJson,{startDate:startStr,endDate:endStr});
-    const suggestions=await generateTrendBasedSuggestions(item.snippet.title);
+    // ---------------- FIXED ANALYTICS ----------------
+    const metrics = encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage');
+    const dimensions = encodeURIComponent('insightTrafficSourceType,country');
+    const filters = encodeURIComponent(`video==${vid}`);
+    const ids = encodeURIComponent('channel==MINE');
+    const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=${dimensions}&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
+    const analyticsResp = await fetchWithAuth(analyticsUrl);
+    const analyticsJson = analyticsResp.ok ? await analyticsResp.json() : { error: await analyticsResp.text() };
+
+    renderResults(item, analyticsJson, {startDate:startStr,endDate:endStr});
+    const suggestions = await generateTrendBasedSuggestions(item.snippet.title);
     renderSuggestions(suggestions);
     el('raw').textContent=JSON.stringify({meta:metaJson,analytics:analyticsJson},null,2);
+
   }catch(err){console.error(err); el('warnings').textContent='Error: '+(err.message||err);}
 });
 
