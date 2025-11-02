@@ -68,6 +68,8 @@ th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
   <textarea id="manualDesc" placeholder="Describe your video..."></textarea>
 
   <button id="generateTitleBtn" class="btn-inline">Find Good Titles</button>
+  <button id="enhanceThumbBtn" class="btn-inline" style="background:#3b82f6">Enhance Thumbnail</button>
+  <img id="enhancedThumb" class="thumb" style="display:none">
 </div>
 
 <!-- RESULTS -->
@@ -236,6 +238,35 @@ el('generateTitleBtn').addEventListener('click', async ()=>{
   const trendDescs=json.items.map(v=>v.snippet.description.slice(0,200));
   renderSuggestionButtons(trendTitles,trendDescs);
   el('warnings').textContent='Suggestions loaded from trending YouTube videos.';
+});
+
+// -------------------- ENHANCE THUMBNAIL --------------------
+el('enhanceThumbBtn').addEventListener('click', async () => {
+  const title = el('manualTitle').value.trim();
+  const desc = el('manualDesc').value.trim();
+  if (!title && !desc) { alert('Enter at least a name or description to enhance thumbnail.'); return; }
+  el('warnings').textContent = 'Enhancing thumbnail based on title and description...';
+
+  try {
+    const query = encodeURIComponent(title || desc);
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
+    const resp = await fetchWithAuth(searchUrl);
+    const json = await resp.json();
+    const videos = json.items || [];
+
+    let bestThumb = '';
+    for (let v of videos) {
+      if (v.snippet.thumbnails?.maxres) { bestThumb = v.snippet.thumbnails.maxres.url; break; }
+      if (v.snippet.thumbnails?.high) { bestThumb = v.snippet.thumbnails.high.url; break; }
+    }
+
+    if (!bestThumb) { bestThumb = 'https://via.placeholder.com/320x180?text=Thumbnail+Suggestion'; el('warnings').textContent='No suitable thumbnail found. Using placeholder.'; }
+    else { el('warnings').textContent='Thumbnail enhanced successfully!'; }
+
+    el('enhancedThumb').src = bestThumb;
+    el('enhancedThumb').style.display = 'block';
+
+  } catch (err) { console.error(err); el('warnings').textContent = 'Error enhancing thumbnail: ' + (err.message || err); }
 });
 
 function renderSuggestionButtons(titles,descriptions){
