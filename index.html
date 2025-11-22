@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>YouTube Live Viewer — Modern</title>
+  <title>YouTube Live Viewer — Modern (with drag & scale & floating recommendations)</title>
 
   <!-- Google Identity Services -->
   <meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
@@ -43,6 +43,7 @@
       margin:18px auto;
       padding:18px;
       box-sizing: border-box;
+      position:relative;
     }
 
     header {
@@ -100,6 +101,7 @@
     .left {
       flex: 3;
       min-width:0;
+      position:relative;
     }
     .right {
       flex: 1;
@@ -125,6 +127,7 @@
       border-radius:12px;
       overflow:hidden;
       background:#000;
+      position:relative; /* default static until made absolute in drag mode */
     }
     .videoFrame iframe{ width:100%;height:520px;border:0;display:block; }
 
@@ -192,6 +195,58 @@
 
     /* small footer note */
     footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center; }
+
+    /* --- draggable/float panel & handles --- */
+    .floatingPanel {
+      position: absolute;
+      z-index: 1200;
+      width: 320px;
+      max-width: 90vw;
+      background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(12,12,12,0.95));
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 8px 36px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.04);
+      color: #fff;
+      user-select: none;
+    }
+    .floatingPanel .title {
+      font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;
+    }
+    .recList { display:flex;flex-direction:column;gap:8px; max-height:360px; overflow:auto; padding-right:6px; }
+    .recItem { display:flex; gap:8px; align-items:center; cursor:pointer; padding:6px; border-radius:8px; }
+    .recItem:hover { background: rgba(255,255,255,0.03); }
+    .recItem img { width:84px; height:48px; object-fit:cover; border-radius:6px; flex-shrink:0; }
+    .recItem .meta { display:flex;flex-direction:column; gap:4px; min-width:0; }
+    .recItem .meta .title { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .recItem .meta .ch { font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* move handle when draggable enabled */
+    .drag-handle {
+      display:inline-block;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);cursor:grab;
+    }
+
+    /* scale handles (circular) */
+    .scale-handle {
+      width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.85);box-shadow:0 2px 6px rgba(0,0,0,0.4);
+      position:absolute; z-index:1300; display:none; touch-action:none;
+    }
+    .scale-handle.show { display:block; }
+    .scale-handle.top { left:50%; transform:translate(-50%,-50%); top:-8px; cursor:n-resize; }
+    .scale-handle.bottom { left:50%; transform:translate(-50%,50%); bottom:-8px; cursor:s-resize; }
+    .scale-handle.left { top:50%; transform:translate(-50%,-50%); left:-8px; cursor:w-resize; }
+    .scale-handle.right { top:50%; transform:translate(50%,-50%); right:-8px; cursor:e-resize; }
+
+    /* when element becomes absolute for dragging */
+    .floating, .abs-pos {
+      position:absolute !important;
+      z-index:1100;
+      touch-action:none;
+    }
+
+    /* visual outline while dragging/scaling */
+    .dragging-outline { outline: 2px dashed rgba(255,255,255,0.12); border-radius:8px; }
+
   </style>
 </head>
 <body>
@@ -242,8 +297,13 @@
           </div>
 
           <div class="videoWrap">
-            <div class="videoFrame" id="videoFrame">
+            <div class="videoFrame" id="videoFrame" data-elem="video">
               <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
+              <!-- scale handles for video -->
+              <div class="scale-handle top" data-handle="top" data-for="videoFrame"></div>
+              <div class="scale-handle bottom" data-handle="bottom" data-for="videoFrame"></div>
+              <div class="scale-handle left" data-handle="left" data-for="videoFrame"></div>
+              <div class="scale-handle right" data-handle="right" data-for="videoFrame"></div>
             </div>
 
             <div class="statsRow" id="statsRow">
@@ -288,7 +348,14 @@
             </div>
           </div>
 
-          <iframe id="liveChat" class="chatFrame" src=""></iframe>
+          <div id="chatWrapper" style="position:relative;">
+            <iframe id="liveChat" class="chatFrame" src=""></iframe>
+            <!-- scale handles for chat -->
+            <div class="scale-handle top" data-handle="top" data-for="chatWrapper"></div>
+            <div class="scale-handle bottom" data-handle="bottom" data-for="chatWrapper"></div>
+            <div class="scale-handle left" data-handle="left" data-for="chatWrapper"></div>
+            <div class="scale-handle right" data-handle="right" data-for="chatWrapper"></div>
+          </div>
 
           <div style="display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:space-between;">
             <div style="color:var(--muted);font-size:13px;">Chat updates every 5s • Stats UI updates every 0.1s</div>
@@ -303,26 +370,42 @@
     <footer>
       Note: API key and client id are used client-side. For production move requests to a backend.
     </footer>
+
+    <!-- Floating recommendations panel (default placed top-right) -->
+    <div id="recPanel" class="floatingPanel" style="right:18px; top:110px;">
+      <div class="title">
+        <div>Recommended Live Streams</div>
+        <div style="display:flex;gap:6px;">
+          <div class="drag-handle" id="recDragHint">⠿</div>
+          <button id="closeRec" class="btn ghost" title="Close">✕</button>
+        </div>
+      </div>
+      <div id="recList" class="recList">
+        <div style="color:var(--muted);font-size:13px;">No stream loaded — recommendations will appear after you load a live stream.</div>
+      </div>
+
+      <!-- scale handles for recPanel -->
+      <div class="scale-handle top" data-handle="top" data-for="recPanel"></div>
+      <div class="scale-handle bottom" data-handle="bottom" data-for="recPanel"></div>
+      <div class="scale-handle left" data-handle="left" data-for="recPanel"></div>
+      <div class="scale-handle right" data-handle="right" data-for="recPanel"></div>
+    </div>
+
   </div>
 
 <script>
 /* -------------------------
-   Configuration (provided)
-   ------------------------- */
+   Configuration
+------------------------- */
 const CLIENT_ID = "901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com";
 const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
 
 /* -------------------------
    App state & caches
-   ------------------------- */
+------------------------- */
 let LIVE_ID = "";
-let statsCache = {
-  views: 0,
-  watching: 0,
-  likes: 0,
-  startTime: null
-};
-let chatTimestamps = []; // unix ms timestamps of received messages (for rate)
+let statsCache = { views:0, watching:0, likes:0, startTime:null };
+let chatTimestamps = [];
 let chatPageToken = null;
 let chatPollingInterval = null;
 let videoStatsInterval = null;
@@ -330,26 +413,18 @@ let uiUpdateInterval = null;
 
 /* -------------------------
    Helpers
-   ------------------------- */
+------------------------- */
 function parseLiveId(input){
   if(!input) return "";
   input = input.trim();
-  // If they pasted a full URL, extract v= or last path segment
   try{
     const url = new URL(input);
     const v = url.searchParams.get('v');
     if(v) return v;
-    // handle youtube short /watch?v= or youtu.be/ID
-    if(url.hostname.includes('youtu.be')){
-      return url.pathname.replace('/','');
-    }
-    // lastPath might be the video id
+    if(url.hostname.includes('youtu.be')) return url.pathname.replace('/','');
     const parts = url.pathname.split('/');
     return parts.pop() || parts.pop();
-  }catch(e){
-    // not a url, assume ID
-    return input;
-  }
+  }catch(e){ return input; }
 }
 
 function formatTime(seconds){
@@ -360,8 +435,8 @@ function formatTime(seconds){
 }
 
 /* -------------------------
-   UI element refs
-   ------------------------- */
+   UI refs
+------------------------- */
 const liveVideo = document.getElementById('liveVideo');
 const liveChat = document.getElementById('liveChat');
 const loadBtn = document.getElementById('loadBtn');
@@ -373,29 +448,19 @@ const watchingEl = document.getElementById('watching');
 const durationEl = document.getElementById('duration');
 const likesEl = document.getElementById('likes');
 const chatRateEl = document.getElementById('chatRate');
-const wrapper = document.querySelector('main');
-const wrapperCard = document.getElementById('videoFrame');
-const appRoot = document.getElementById('appRoot');
-const themeToggle = document.getElementById('themeToggle');
-const signedInfo = document.getElementById('signedInfo');
-const signinBox = document.getElementById('signinBox');
-const logoutBtn = document.getElementById('logoutBtn');
-const userNameEl = document.getElementById('userName');
-const userEmailEl = document.getElementById('userEmail');
-const userAvatarImg = document.querySelector('#userAvatar img');
-const addMsgsBtn = document.getElementById('addMsgsBtn');
+const recPanel = document.getElementById('recPanel');
+const recList = document.getElementById('recList');
+const closeRec = document.getElementById('closeRec');
 
 /* -------------------------
    Local storage helpers
-   ------------------------- */
+------------------------- */
 function saveToLocal(key,value){ localStorage.setItem(key, JSON.stringify(value)); }
-function loadFromLocal(key, fallback=null){
-  try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; }
-}
+function loadFromLocal(key,fallback=null){ try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; } }
 
 /* -------------------------
-   Channel storage (saved channels)
-   ------------------------- */
+   Saved channels
+------------------------- */
 function loadSavedChannels(){
   const saved = loadFromLocal('yt_saved_channels', []);
   populateChannelSelect(saved);
@@ -409,29 +474,29 @@ function populateChannelSelect(list){
     channelSelect.appendChild(opt);
   });
 }
-function addSavedChannel(id, title){
+function addSavedChannel(id,title){
   if(!id) return;
   const list = loadFromLocal('yt_saved_channels', []);
   if(list.find(x=>x.id===id)) return alert('Channel already saved');
-  list.push({ id, title: title || id });
-  saveToLocal('yt_saved_channels', list);
+  list.push({id,title:title||id});
+  saveToLocal('yt_saved_channels',list);
   populateChannelSelect(list);
 }
 
 /* -------------------------
    Channel selector events
-   ------------------------- */
+------------------------- */
 channelSelect.addEventListener('change', ()=>{
   const val = channelSelect.value;
-  if(val) {
+  if(val){
     liveIdInput.value = val;
     startViewing(val);
   }
 });
 
 /* -------------------------
-   Load / Save / Clear events
-   ------------------------- */
+   Load / Save / Clear
+------------------------- */
 loadBtn.addEventListener('click', ()=>{
   const id = parseLiveId(liveIdInput.value);
   if(!id) return alert('Enter a live ID or paste a YouTube URL.');
@@ -440,32 +505,27 @@ loadBtn.addEventListener('click', ()=>{
 
 saveChannelBtn.addEventListener('click', async ()=>{
   if(!LIVE_ID) return alert('Load a live first.');
-  // fetch video title
   try{
     const info = await fetchVideoInfo(LIVE_ID);
-    const title = (info && info.snippet && info.snippet.title) ? info.snippet.title : LIVE_ID;
-    addSavedChannel(LIVE_ID, title);
+    const title = (info?.snippet?.title) || LIVE_ID;
+    addSavedChannel(LIVE_ID,title);
     alert('Saved channel: ' + title);
   }catch(e){
     console.warn(e);
-    addSavedChannel(LIVE_ID, LIVE_ID);
+    addSavedChannel(LIVE_ID,LIVE_ID);
     alert('Saved id: ' + LIVE_ID);
   }
 });
 
-addMsgsBtn.addEventListener('click', ()=>{
-  if(confirm('Clear saved channels?')){
-    localStorage.removeItem('yt_saved_channels');
-    populateChannelSelect([]);
-  }
-});
+closeRec.addEventListener('click', ()=> recPanel.style.display='none');
 
 /* -------------------------
-   Video & Chat loading & polling
-   ------------------------- */
+   Video & chat polling
+------------------------- */
 async function startViewing(newId){
   stopPolling();
   LIVE_ID = newId;
+
   // set iframe srcs
   liveVideo.src = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
   liveChat.src = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
@@ -475,75 +535,51 @@ async function startViewing(newId){
   chatPageToken = null;
   statsCache = { views:0, watching:0, likes:0, startTime:null };
 
-  // fetch initial stats and liveChatId
   const info = await fetchVideoInfo(LIVE_ID);
-  if(!info){
-    alert('Could not load video info — ensure the ID is correct and the video is accessible.');
-    return;
-  }
+  if(!info){ alert('Could not load video info — ensure the ID is correct and the video is accessible.'); return; }
 
-  // store liveChatId if present
   const liveDetails = info.liveStreamingDetails || {};
   const liveChatId = liveDetails.activeLiveChatId || null;
-  if(!liveChatId) {
-    console.warn('No activeLiveChatId found for this video; chat rate will be N/A.');
-  }
+  if(!liveChatId) console.warn('No activeLiveChatId found; chat rate will be N/A.');
 
-  // initial stats and start polling
   await updateStatsFromVideoInfo(info);
 
-  // Start polling intervals
-  videoStatsInterval = setInterval(fetchAndUpdateVideoStats, 15000); // every 15s
-  chatPollingInterval = setInterval(()=>{ if(liveChatId) fetchChatMessages(liveChatId); }, 5000); // every 5s
-  uiUpdateInterval = setInterval(updateStatDisplay, 100); // every 0.1s
+  videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
+  chatPollingInterval = setInterval(()=>{ if(liveChatId) fetchChatMessages(liveChatId); },5000);
+  uiUpdateInterval = setInterval(updateStatDisplay,100);
 
-  // show wrapper / card (in case sign-in saved state shows UI)
-  document.querySelector('main').style.display = 'flex';
+  // show recommended panel directly under live chat
+  recPanel.style.display='block';
+  fetchRecommendedLiveStreams(info?.snippet?.title || '');
 }
 
-/* Fetch video info (statistics & liveStreamingDetails & snippet) */
 async function fetchVideoInfo(videoId){
   const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,liveStreamingDetails&id=${videoId}&key=${API_KEY}`;
   try{
     const res = await fetch(url);
     const json = await res.json();
-    if(json.items && json.items.length>0) return json.items[0];
+    if(json.items?.length>0) return json.items[0];
     return null;
-  }catch(e){
-    console.error('fetchVideoInfo error', e);
-    return null;
-  }
+  }catch(e){ console.error('fetchVideoInfo', e); return null; }
 }
 
-/* Update stats cache from video info */
 async function updateStatsFromVideoInfo(info){
-  if(!info) return;
   const stats = info.statistics || {};
   const live = info.liveStreamingDetails || {};
-  statsCache.views = Number(stats.viewCount || 0);
-  statsCache.likes = Number(stats.likeCount || 0);
-  statsCache.watching = Number(live.concurrentViewers || 0);
+  statsCache.views = Number(stats.viewCount||0);
+  statsCache.likes = Number(stats.likeCount||0);
+  statsCache.watching = Number(live.concurrentViewers||0);
   statsCache.startTime = live.actualStartTime ? new Date(live.actualStartTime) : null;
-
-  // also attempt to fill channel select entry title when saving
 }
 
-/* Periodic fetch to update video stats */
 async function fetchAndUpdateVideoStats(){
   if(!LIVE_ID) return;
-  try{
-    const info = await fetchVideoInfo(LIVE_ID);
-    if(info) await updateStatsFromVideoInfo(info);
-  }catch(e){
-    console.error('fetchAndUpdateVideoStats', e);
-  }
+  try{ const info = await fetchVideoInfo(LIVE_ID); if(info) await updateStatsFromVideoInfo(info); }catch(e){ console.error(e); }
 }
 
-/* Fetch live chat messages and record their timestamps to compute rate */
 async function fetchChatMessages(liveChatId){
-  // we use pageToken to paginate — but for rate, we only need new messages
   const base = `https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=${encodeURIComponent(liveChatId)}&key=${API_KEY}&maxResults=200`;
-  const url = chatPageToken ? base + '&pageToken=' + chatPageToken : base;
+  const url = chatPageToken ? base+'&pageToken='+chatPageToken : base;
   try{
     const res = await fetch(url);
     const json = await res.json();
@@ -552,167 +588,59 @@ async function fetchChatMessages(liveChatId){
     const items = json.items || [];
     const now = Date.now();
     items.forEach(item=>{
-      const t = item.snippet && item.snippet.publishedAt ? new Date(item.snippet.publishedAt).getTime() : now;
+      const t = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt).getTime() : now;
       chatTimestamps.push(t);
     });
-    // purge older than 70s
-    const cutoff = Date.now() - (70 * 1000);
-    chatTimestamps = chatTimestamps.filter(ts => ts >= cutoff);
-  }catch(e){
-    console.error('fetchChatMessages', e);
-  }
+    chatTimestamps = chatTimestamps.filter(ts=>ts>=Date.now()-60000);
+  }catch(e){ console.error(e); }
 }
 
-/* compute chat rate: messages per minute using last 60s */
-function computeChatRate(){
-  const cutoff = Date.now() - (60 * 1000);
-  const last60 = chatTimestamps.filter(ts => ts >= cutoff);
-  return last60.length; // messages per last minute
-}
+function computeChatRate(){ return chatTimestamps.filter(ts=>ts>=Date.now()-60000).length; }
 
-/* update UI (every 0.1s) */
 function updateStatDisplay(){
-  // Smooth number display (we just directly set them, but with CSS transitions)
   viewsEl.innerText = statsCache.views.toLocaleString();
   watchingEl.innerText = statsCache.watching.toLocaleString();
   likesEl.innerText = statsCache.likes.toLocaleString();
-  if(statsCache.startTime){
-    const diff = Math.floor((Date.now() - statsCache.startTime.getTime())/1000);
-    durationEl.innerText = formatTime(diff);
-  } else {
-    durationEl.innerText = '--:--:--';
-  }
+  durationEl.innerText = statsCache.startTime ? formatTime(Math.floor((Date.now()-statsCache.startTime.getTime())/1000)) : '--:--:--';
   chatRateEl.innerText = computeChatRate() + ' / min';
 }
 
-/* stop polling when changing streams */
 function stopPolling(){
-  if(videoStatsInterval) { clearInterval(videoStatsInterval); videoStatsInterval = null; }
-  if(chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
-  if(uiUpdateInterval) { clearInterval(uiUpdateInterval); uiUpdateInterval = null; }
+  if(videoStatsInterval){ clearInterval(videoStatsInterval); videoStatsInterval=null; }
+  if(chatPollingInterval){ clearInterval(chatPollingInterval); chatPollingInterval=null; }
+  if(uiUpdateInterval){ clearInterval(uiUpdateInterval); uiUpdateInterval=null; }
 }
 
 /* -------------------------
-   Theme toggle & persist
-   ------------------------- */
-function loadTheme(){
-  const t = loadFromLocal('yt_theme') || 'dark';
-  setTheme(t);
-}
-function setTheme(t){
-  appRoot.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
-  themeToggle.textContent = t === 'light' ? '☀️' : '🌙';
-  saveToLocal('yt_theme', t);
-}
-themeToggle.addEventListener('click', ()=>{
-  const cur = appRoot.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  setTheme(cur === 'light' ? 'dark' : 'light');
-});
-
-/* -------------------------
-   Google Sign-In handling
-   - Saves credential (JWT) and profile to localStorage
-   - On load, uses stored profile to show signed UI
-   ------------------------- */
-
-/* callback from Google Identity Services */
-async function onGoogleSignIn(response){
-  if(!response || !response.credential){
-    console.warn('No credential from Google', response);
-    return;
-  }
-  // response.credential is a JWT — decode payload (base64url)
+   Recommended live streams
+------------------------- */
+async function fetchRecommendedLiveStreams(title){
+  if(!title){ recList.innerHTML='<div>No title for recommendations</div>'; return; }
+  recList.innerHTML='<div>Loading recommended live streams…</div>';
   try{
-    const payload = JSON.parse(atob(response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    // payload contains name, email, picture
-    const profile = {
-      name: payload.name || payload.email || 'User',
-      email: payload.email || '',
-      picture: payload.picture || '',
-      credential: response.credential,
-      savedAt: Date.now()
-    };
-    saveToLocal('yt_g_profile', profile);
-    applySignedInProfile(profile);
-    // hide sign-in UI
-    signinBox.style.display = 'none';
-    signedInfo.style.display = 'flex';
-  }catch(e){
-    console.error('decoding credential error', e);
-  }
+    const q = encodeURIComponent(title+' live');
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&q=${q}&key=${API_KEY}&maxResults=8`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if(!json?.items?.length){ recList.innerHTML='<div>No live recommendations found</div>'; return; }
+    recList.innerHTML='';
+    json.items.forEach(it=>{
+      const vid=it.id.videoId;
+      const snip=it.snippet||{};
+      const thumb=(snip.thumbnails?.medium?.url || snip.thumbnails?.default?.url) || '';
+      const titleText = snip.title || vid;
+      const channel = snip.channelTitle || '';
+      const item = document.createElement('div');
+      item.className='recItem';
+      item.innerHTML = `<img src="${thumb}" alt="thumb" /><div class="meta"><div class="title">${escapeHtml(titleText)}</div><div class="ch">${escapeHtml(channel)} • Live</div></div>`;
+      item.addEventListener('click', ()=> { liveIdInput.value=vid; startViewing(vid); });
+      recList.appendChild(item);
+    });
+  }catch(e){ console.error(e); recList.innerHTML='<div>Error fetching recommendations</div>'; }
 }
 
-/* apply profile to UI */
-function applySignedInProfile(profile){
-  if(!profile) return;
-  userNameEl.textContent = profile.name || '';
-  userEmailEl.textContent = profile.email || '';
-  if(profile.picture) userAvatarImg.src = profile.picture;
-  signinBox.style.display = 'none';
-  signedInfo.style.display = 'flex';
-}
-
-/* auto-restore sign-in if saved */
-function tryRestoreSignIn(){
-  const profile = loadFromLocal('yt_g_profile', null);
-  if(profile && profile.credential){
-    // we trust the saved profile only for UI (API calls use API_KEY)
-    applySignedInProfile(profile);
-  } else {
-    signinBox.style.display = 'block';
-    signedInfo.style.display = 'none';
-  }
-}
-
-logoutBtn.addEventListener('click', ()=>{
-  if(confirm('Log out and clear saved sign-in?')){
-    localStorage.removeItem('yt_g_profile');
-    signedInfo.style.display = 'none';
-    signinBox.style.display = 'block';
-    userNameEl.textContent = '';
-    userEmailEl.textContent = '';
-    userAvatarImg.src = '';
-  }
-});
-
-/* -------------------------
-   On load: restore theme, sign-in, saved channels
-   ------------------------- */
-window.addEventListener('load', ()=>{
-  // show main area hidden by default until loaded
-  document.querySelector('main').style.display = 'flex';
-
-  loadTheme();
-  tryRestoreSignIn();
-  loadSavedChannels();
-
-  // if they have a previously-loaded channel saved, preselect
-  const lastViewed = loadFromLocal('yt_last_viewed', null);
-  if(lastViewed){
-    liveIdInput.value = lastViewed;
-    // user still needs to press Load, or if signed-in, we can auto-start
-  }
-
-  // if the user saved the sign-in and had a last viewed channel, auto-start
-  if(loadFromLocal('yt_g_profile', null) && lastViewed){
-    // small delay to let UI render
-    setTimeout(()=> startViewing(lastViewed), 400);
-  }
-});
-
-/* Save last viewed channel on unload */
-window.addEventListener('beforeunload', ()=>{
-  if(LIVE_ID) saveToLocal('yt_last_viewed', LIVE_ID);
-});
-
-/* -------------------------
-   Init GSI rendering for the signin button (so the button appears)
-   This will call our onGoogleSignIn when user signs in.
-   ------------------------- */
-window.onloadGSI = function(){ /* placeholder */ };
-// The gsi button auto-attaches to the page when the script loads using the meta tag
-// No extra code needed here beyond supplying a global function `onGoogleSignIn` (above).
-
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 </script>
+
 </body>
 </html>
