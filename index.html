@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>YouTube Live Viewer — Modern (with drag & scale & floating recommendations)</title>
+  <title>YouTube Live Viewer — Modern</title>
 
   <!-- Google Identity Services -->
   <meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
@@ -75,7 +75,6 @@
       display:flex;gap:10px;align-items:center;
     }
 
-    /* Top small controls */
     .small {
       display:flex;gap:8px;align-items:center;
       background:var(--card);
@@ -97,18 +96,9 @@
       align-items:flex-start;
     }
 
-    /* left and right columns */
-    .left {
-      flex: 3;
-      min-width:0;
-      position:relative;
-    }
-    .right {
-      flex: 1;
-      min-width:0;
-    }
+    .left { flex:3; min-width:0; position:relative; }
+    .right { flex:1; min-width:0; }
 
-    /* glass card */
     .card {
       background:var(--card);
       border-radius:14px;
@@ -118,20 +108,10 @@
       box-shadow: 0 6px 30px rgba(2,6,23,0.45);
     }
 
-    /* video area */
-    .videoWrap {
-      display:flex;flex-direction:column;gap:12px;
-    }
-    .videoFrame {
-      width:100%;
-      border-radius:12px;
-      overflow:hidden;
-      background:#000;
-      position:relative; /* default static until made absolute in drag mode */
-    }
+    .videoWrap { display:flex;flex-direction:column;gap:12px; }
+    .videoFrame { width:100%; border-radius:12px; overflow:hidden; background:#000; }
     .videoFrame iframe{ width:100%;height:520px;border:0;display:block; }
 
-    /* stats row */
     .statsRow{
       display:flex;gap:12px;align-items:center;justify-content:space-between;
       margin-top:8px;
@@ -145,10 +125,8 @@
     }
     .stat .label{ font-size:12px;color:var(--muted); }
     .stat .value{ font-size:18px;font-weight:700; transition: all 0.12s ease; }
-
     .stat .smallNote{ font-size:12px;color:var(--muted); }
 
-    /* channel selector */
     .channelRow{
       display:flex;gap:8px;align-items:center;margin-bottom:12px;
     }
@@ -156,22 +134,15 @@
       background:transparent;border:1px solid var(--glass-border);padding:8px;border-radius:8px;color:inherit;
       outline:none;
     }
-    .btn {
-      padding:8px 12px;border-radius:10px;border:none;cursor:pointer;background:var(--accent);color:white;font-weight:600;
-    }
+    .btn { padding:8px 12px;border-radius:10px;border:none;cursor:pointer;background:var(--accent);color:white;font-weight:600; }
     .btn.ghost { background:transparent;border:1px solid var(--glass-border); color:inherit;font-weight:600; }
 
-    /* chat */
     .chatFrame{ width:100%; height:520px;border-radius:10px;border:none; }
 
-    /* speaker row */
-    .profile{
-      display:flex;gap:8px;align-items:center;
-    }
+    .profile{ display:flex;gap:8px;align-items:center; }
     .avatar{ width:36px;height:36px;border-radius:50%;overflow:hidden;background:#ddd; }
     .avatar img{ width:100%;height:100%;object-fit:cover;display:block; }
 
-    /* small responsive */
     @media (max-width:1000px){
       main{ flex-direction:column; }
       .videoFrame iframe, .chatFrame { height:420px; }
@@ -182,71 +153,6 @@
       header{ flex-direction:column; align-items:flex-start; gap:10px; }
       .controls { width:100%; justify-content:space-between; }
     }
-
-    /* subtle animations */
-    .pulse {
-      animation: pulse 1.6s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%{ transform:translateY(0); opacity:1; }
-      50%{ transform:translateY(-3px); opacity:0.9;}
-      100%{ transform:translateY(0); opacity:1;}
-    }
-
-    /* small footer note */
-    footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center; }
-
-    /* --- draggable/float panel & handles --- */
-    .floatingPanel {
-      position: absolute;
-      z-index: 1200;
-      width: 320px;
-      max-width: 90vw;
-      background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(12,12,12,0.95));
-      border-radius: 12px;
-      padding: 10px;
-      box-shadow: 0 8px 36px rgba(0,0,0,0.6);
-      border: 1px solid rgba(255,255,255,0.04);
-      color: #fff;
-      user-select: none;
-    }
-    .floatingPanel .title {
-      font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;
-    }
-    .recList { display:flex;flex-direction:column;gap:8px; max-height:360px; overflow:auto; padding-right:6px; }
-    .recItem { display:flex; gap:8px; align-items:center; cursor:pointer; padding:6px; border-radius:8px; }
-    .recItem:hover { background: rgba(255,255,255,0.03); }
-    .recItem img { width:84px; height:48px; object-fit:cover; border-radius:6px; flex-shrink:0; }
-    .recItem .meta { display:flex;flex-direction:column; gap:4px; min-width:0; }
-    .recItem .meta .title { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .recItem .meta .ch { font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-    /* move handle when draggable enabled */
-    .drag-handle {
-      display:inline-block;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);cursor:grab;
-    }
-
-    /* scale handles (circular) */
-    .scale-handle {
-      width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.85);box-shadow:0 2px 6px rgba(0,0,0,0.4);
-      position:absolute; z-index:1300; display:none; touch-action:none;
-    }
-    .scale-handle.show { display:block; }
-    .scale-handle.top { left:50%; transform:translate(-50%,-50%); top:-8px; cursor:n-resize; }
-    .scale-handle.bottom { left:50%; transform:translate(-50%,50%); bottom:-8px; cursor:s-resize; }
-    .scale-handle.left { top:50%; transform:translate(-50%,-50%); left:-8px; cursor:w-resize; }
-    .scale-handle.right { top:50%; transform:translate(50%,-50%); right:-8px; cursor:e-resize; }
-
-    /* when element becomes absolute for dragging */
-    .floating, .abs-pos {
-      position:absolute !important;
-      z-index:1100;
-      touch-action:none;
-    }
-
-    /* visual outline while dragging/scaling */
-    .dragging-outline { outline: 2px dashed rgba(255,255,255,0.12); border-radius:8px; }
-
   </style>
 </head>
 <body>
@@ -297,13 +203,8 @@
           </div>
 
           <div class="videoWrap">
-            <div class="videoFrame" id="videoFrame" data-elem="video">
+            <div class="videoFrame" id="videoFrame">
               <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
-              <!-- scale handles for video -->
-              <div class="scale-handle top" data-handle="top" data-for="videoFrame"></div>
-              <div class="scale-handle bottom" data-handle="bottom" data-for="videoFrame"></div>
-              <div class="scale-handle left" data-handle="left" data-for="videoFrame"></div>
-              <div class="scale-handle right" data-handle="right" data-for="videoFrame"></div>
             </div>
 
             <div class="statsRow" id="statsRow">
@@ -312,6 +213,14 @@
                 <div class="value" id="views">0</div>
                 <div class="smallNote">Total video views</div>
               </div>
+
+              <!-- NEW: Total Chats -->
+              <div class="stat">
+                <div class="label">Total Chats</div>
+                <div class="value" id="totalChats">0</div>
+                <div class="smallNote">Messages received</div>
+              </div>
+
               <div class="stat">
                 <div class="label">Watching Now</div>
                 <div class="value" id="watching">0</div>
@@ -350,11 +259,6 @@
 
           <div id="chatWrapper" style="position:relative;">
             <iframe id="liveChat" class="chatFrame" src=""></iframe>
-            <!-- scale handles for chat -->
-            <div class="scale-handle top" data-handle="top" data-for="chatWrapper"></div>
-            <div class="scale-handle bottom" data-handle="bottom" data-for="chatWrapper"></div>
-            <div class="scale-handle left" data-handle="left" data-for="chatWrapper"></div>
-            <div class="scale-handle right" data-handle="right" data-for="chatWrapper"></div>
           </div>
 
           <div style="display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:space-between;">
@@ -363,6 +267,12 @@
               <button class="btn ghost" id="addMsgsBtn">Clear saved channels</button>
             </div>
           </div>
+
+          <!-- Recommended lives under chat -->
+          <div id="recPanel" style="margin-top:12px;">
+            <div style="font-weight:700;margin-bottom:6px;">Recommended Live Streams</div>
+            <div id="recList" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;"></div>
+          </div>
         </div>
       </div>
     </main>
@@ -370,39 +280,12 @@
     <footer>
       Note: API key and client id are used client-side. For production move requests to a backend.
     </footer>
-
-    <!-- Floating recommendations panel (default placed top-right) -->
-    <div id="recPanel" class="floatingPanel" style="right:18px; top:110px;">
-      <div class="title">
-        <div>Recommended Live Streams</div>
-        <div style="display:flex;gap:6px;">
-          <div class="drag-handle" id="recDragHint">⠿</div>
-          <button id="closeRec" class="btn ghost" title="Close">✕</button>
-        </div>
-      </div>
-      <div id="recList" class="recList">
-        <div style="color:var(--muted);font-size:13px;">No stream loaded — recommendations will appear after you load a live stream.</div>
-      </div>
-
-      <!-- scale handles for recPanel -->
-      <div class="scale-handle top" data-handle="top" data-for="recPanel"></div>
-      <div class="scale-handle bottom" data-handle="bottom" data-for="recPanel"></div>
-      <div class="scale-handle left" data-handle="left" data-for="recPanel"></div>
-      <div class="scale-handle right" data-handle="right" data-for="recPanel"></div>
-    </div>
-
   </div>
 
 <script>
-/* -------------------------
-   Configuration
-------------------------- */
 const CLIENT_ID = "901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com";
 const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
 
-/* -------------------------
-   App state & caches
-------------------------- */
 let LIVE_ID = "";
 let statsCache = { views:0, watching:0, likes:0, startTime:null };
 let chatTimestamps = [];
@@ -411,9 +294,6 @@ let chatPollingInterval = null;
 let videoStatsInterval = null;
 let uiUpdateInterval = null;
 
-/* -------------------------
-   Helpers
-------------------------- */
 function parseLiveId(input){
   if(!input) return "";
   input = input.trim();
@@ -434,9 +314,7 @@ function formatTime(seconds){
   return `${h}:${m}:${s}`;
 }
 
-/* -------------------------
-   UI refs
-------------------------- */
+/* UI refs */
 const liveVideo = document.getElementById('liveVideo');
 const liveChat = document.getElementById('liveChat');
 const loadBtn = document.getElementById('loadBtn');
@@ -444,23 +322,17 @@ const saveChannelBtn = document.getElementById('saveChannelBtn');
 const liveIdInput = document.getElementById('liveIdInput');
 const channelSelect = document.getElementById('channelSelect');
 const viewsEl = document.getElementById('views');
+const totalChatsEl = document.getElementById('totalChats');
 const watchingEl = document.getElementById('watching');
 const durationEl = document.getElementById('duration');
 const likesEl = document.getElementById('likes');
 const chatRateEl = document.getElementById('chatRate');
-const recPanel = document.getElementById('recPanel');
 const recList = document.getElementById('recList');
-const closeRec = document.getElementById('closeRec');
 
-/* -------------------------
-   Local storage helpers
-------------------------- */
+/* Local storage */
 function saveToLocal(key,value){ localStorage.setItem(key, JSON.stringify(value)); }
 function loadFromLocal(key,fallback=null){ try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; } }
 
-/* -------------------------
-   Saved channels
-------------------------- */
 function loadSavedChannels(){
   const saved = loadFromLocal('yt_saved_channels', []);
   populateChannelSelect(saved);
@@ -483,9 +355,6 @@ function addSavedChannel(id,title){
   populateChannelSelect(list);
 }
 
-/* -------------------------
-   Channel selector events
-------------------------- */
 channelSelect.addEventListener('change', ()=>{
   const val = channelSelect.value;
   if(val){
@@ -494,9 +363,6 @@ channelSelect.addEventListener('change', ()=>{
   }
 });
 
-/* -------------------------
-   Load / Save / Clear
-------------------------- */
 loadBtn.addEventListener('click', ()=>{
   const id = parseLiveId(liveIdInput.value);
   if(!id) return alert('Enter a live ID or paste a YouTube URL.');
@@ -517,8 +383,6 @@ saveChannelBtn.addEventListener('click', async ()=>{
   }
 });
 
-closeRec.addEventListener('click', ()=> recPanel.style.display='none');
-
 /* -------------------------
    Video & chat polling
 ------------------------- */
@@ -526,17 +390,16 @@ async function startViewing(newId){
   stopPolling();
   LIVE_ID = newId;
 
-  // set iframe srcs
   liveVideo.src = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
   liveChat.src = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
 
-  // reset caches
   chatTimestamps = [];
   chatPageToken = null;
   statsCache = { views:0, watching:0, likes:0, startTime:null };
+  totalChatsEl.innerText = 0;
 
   const info = await fetchVideoInfo(LIVE_ID);
-  if(!info){ alert('Could not load video info — ensure the ID is correct and the video is accessible.'); return; }
+  if(!info){ alert('Could not load video info — ensure the ID is correct.'); return; }
 
   const liveDetails = info.liveStreamingDetails || {};
   const liveChatId = liveDetails.activeLiveChatId || null;
@@ -547,9 +410,6 @@ async function startViewing(newId){
   videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
   chatPollingInterval = setInterval(()=>{ if(liveChatId) fetchChatMessages(liveChatId); },5000);
   uiUpdateInterval = setInterval(updateStatDisplay,100);
-
-  // show recommended panel directly under live chat
-  recPanel.style.display='block';
   fetchRecommendedLiveStreams(info?.snippet?.title || '');
 }
 
@@ -592,6 +452,8 @@ async function fetchChatMessages(liveChatId){
       chatTimestamps.push(t);
     });
     chatTimestamps = chatTimestamps.filter(ts=>ts>=Date.now()-60000);
+
+    totalChatsEl.innerText = Number(totalChatsEl.innerText || 0) + items.length;
   }catch(e){ console.error(e); }
 }
 
@@ -631,8 +493,8 @@ async function fetchRecommendedLiveStreams(title){
       const titleText = snip.title || vid;
       const channel = snip.channelTitle || '';
       const item = document.createElement('div');
-      item.className='recItem';
-      item.innerHTML = `<img src="${thumb}" alt="thumb" /><div class="meta"><div class="title">${escapeHtml(titleText)}</div><div class="ch">${escapeHtml(channel)} • Live</div></div>`;
+      item.style.display='flex'; item.style.gap='6px'; item.style.cursor='pointer';
+      item.innerHTML = `<img src="${thumb}" alt="thumb" width="84" height="48" style="border-radius:6px;flex-shrink:0;"><div style="display:flex;flex-direction:column;overflow:hidden;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(titleText)}</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(channel)} • Live</div></div>`;
       item.addEventListener('click', ()=> { liveIdInput.value=vid; startViewing(vid); });
       recList.appendChild(item);
     });
@@ -641,6 +503,5 @@ async function fetchRecommendedLiveStreams(title){
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 </script>
-
 </body>
 </html>
