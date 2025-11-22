@@ -2,16 +2,35 @@
 <html>
 <head>
   <title>YouTube Live Viewer w/ Google Sign-In</title>
+
   <meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <style>
     body { font-family: Arial; background:#111; color:white; padding:20px; }
-    #playerArea, #chatArea { display:none; margin-top:20px; }
-    #signinDiv { margin-top:30px; }
-    input { padding:10px; width:250px; border-radius:6px; border:none; }
+    input { padding:10px; width:260px; border-radius:6px; border:none; }
     button { padding:10px 20px; border:none; border-radius:6px; cursor:pointer; }
-    iframe { border:none; }
+
+    #wrapper {
+      display:flex;
+      gap:20px;
+      margin-top:20px;
+    }
+
+    #playerArea { flex:3; }
+    #chatArea { flex:1; }
+
+    iframe { border:none; width:100%; height:450px; }
+
+    #statsBar {
+      margin-top:10px;
+      background:#222;
+      padding:10px;
+      border-radius:8px;
+      font-size:16px;
+      display:flex;
+      justify-content:space-between;
+    }
   </style>
 </head>
 <body>
@@ -19,13 +38,14 @@
 <h2>YouTube Live Viewer</h2>
 
 <div id="liveSelect">
-  <p>Enter the YouTube **Live Video ID** you want to watch:</p>
+  <p>Enter the **YouTube Live Video ID**:</p>
   <input id="liveIdInput" placeholder="e.g. wXhTHyIgQ_U">
   <button onclick="saveLiveId()">Load Live</button>
 </div>
 
 <div id="signinDiv" style="margin-top:30px;">
   <h3>Sign in to continue</h3>
+
   <div id="g_id_onload"
        data-client_id="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com"
        data-context="signin"
@@ -36,22 +56,35 @@
   <div class="g_id_signin" data-type="standard"></div>
 </div>
 
-<!-- VIDEO AREA -->
-<div id="playerArea">
-  <h3>Live Video</h3>
-  <iframe id="liveVideo" width="800" height="450"></iframe>
-</div>
+<!-- VIDEO + CHAT SIDE BY SIDE -->
+<div id="wrapper" style="display:none;">
 
-<!-- CHAT AREA -->
-<div id="chatArea">
-  <h3>Live Chat</h3>
-  <iframe id="liveChat" width="400" height="450"></iframe>
+  <!-- LEFT: VIDEO -->
+  <div id="playerArea">
+    <h3>Live Video</h3>
+    <iframe id="liveVideo"></iframe>
+
+    <!-- Stats under the video -->
+    <div id="statsBar">
+      <div>Views: <span id="views">0</span></div>
+      <div>Watching Now: <span id="watching">0</span></div>
+      <div>Live For: <span id="duration">--:--:--</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: CHAT -->
+  <div id="chatArea">
+    <h3>Live Chat</h3>
+    <iframe id="liveChat"></iframe>
+  </div>
+
 </div>
 
 <script>
 let LIVE_ID = null;
 const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
 
+// User enters the video ID
 function saveLiveId() {
   LIVE_ID = document.getElementById("liveIdInput").value.trim();
   if (!LIVE_ID) return alert("Please enter a live ID.");
@@ -65,23 +98,61 @@ function onGoogleSignIn(response) {
     return;
   }
 
-  // Hide sign-in UI
   document.getElementById("signinDiv").style.display = "none";
   document.getElementById("liveSelect").style.display = "none";
-
-  // Show player + chat
-  document.getElementById("playerArea").style.display = "block";
-  document.getElementById("chatArea").style.display = "block";
+  document.getElementById("wrapper").style.display = "flex";
 
   loadLiveEmbed();
+  fetchStats();
+  setInterval(fetchStats, 15000); // update every 15 seconds
 }
 
+// Load video + chat frames
 function loadLiveEmbed() {
-  const videoURL = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
-  const chatURL = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
+  document.getElementById("liveVideo").src =
+    `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
 
-  document.getElementById("liveVideo").src = videoURL;
-  document.getElementById("liveChat").src = chatURL;
+  document.getElementById("liveChat").src =
+    `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
+}
+
+// Fetch live stats
+async function fetchStats() {
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,statistics&id=${LIVE_ID}&key=${API_KEY}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.items || data.items.length === 0) return;
+
+    const stats = data.items[0].statistics;
+    const live = data.items[0].liveStreamingDetails;
+
+    // Update stats
+    document.getElementById("views").innerText = stats.viewCount || "0";
+    document.getElementById("watching").innerText = live.concurrentViewers || "0";
+
+    // Duration
+    if (live.actualStartTime) {
+      const start = new Date(live.actualStartTime);
+      const now = new Date();
+      const diff = Math.floor((now - start) / 1000);
+
+      document.getElementById("duration").innerText = formatTime(diff);
+    }
+
+  } catch (e) {
+    console.error("Failed to fetch stats", e);
+  }
+}
+
+// Convert seconds → HH:MM:SS
+function formatTime(seconds) {
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
 }
 </script>
 
