@@ -1,291 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>YouTube Live Viewer — Modern</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>YouTube Live Viewer — Modern</title>
 
-  <!-- Google Identity Services -->
-  <meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Google Identity Services -->
+<meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <style>
-    :root{
-      --bg-1: #0d0f12;
-      --bg-2: linear-gradient(135deg,#0d0f12,#121215);
-      --card: rgba(255,255,255,0.06);
-      --accent: #ff3b7a;
-      --muted: rgba(255,255,255,0.7);
-      --glass-border: rgba(255,255,255,0.08);
-    }
-    [data-theme="light"]{
-      --bg-1: #f2f5f8;
-      --bg-2: linear-gradient(135deg,#f2f5f8,#e9eef4);
-      --card: rgba(22,28,36,0.03);
-      --accent: #ff0066;
-      --muted: rgba(0,0,0,0.6);
-      --glass-border: rgba(0,0,0,0.06);
-      color: #0b1220;
-    }
-
-    html,body{
-      height:100%;
-      margin:0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background: var(--bg-2);
-      color: white;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-    }
-
-    .app {
-      max-width:1200px;
-      margin:18px auto;
-      padding:18px;
-      box-sizing: border-box;
-      position:relative;
-    }
-
-    header {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:14px;
-    }
-
-    .brand {
-      display:flex;
-      gap:12px;
-      align-items:center;
-    }
-
-    .logo {
-      width:48px;height:48px;border-radius:10px;
-      background:linear-gradient(180deg,#ff6b9e,#ff3b7a);
-      display:flex;align-items:center;justify-content:center;font-weight:700;
-      box-shadow:0 6px 24px rgba(255,59,122,0.18);
-      color:white;
-    }
-
-    h1{ margin:0;font-size:20px;}
-    p.subtitle{ margin:0;color:var(--muted); font-size:13px;}
-
-    .controls {
-      display:flex;gap:10px;align-items:center;
-    }
-
-    .small {
-      display:flex;gap:8px;align-items:center;
-      background:var(--card);
-      padding:8px;border-radius:12px;border:1px solid var(--glass-border);
-      box-shadow: 0 6px 18px rgba(2,6,23,0.5);
-    }
-
-    .small button {
-      background:transparent;border:none;color:inherit;padding:6px 10px;border-radius:8px;cursor:pointer;
-    }
-    .small .accent {
-      background:linear-gradient(90deg,var(--accent),#ff7aa6);
-      color:white;padding:6px 10px;font-weight:600;border:none;
-    }
-
-    main {
-      display:flex;
-      gap:20px;
-      align-items:flex-start;
-    }
-
-    .left { flex:3; min-width:0; position:relative; }
-    .right { flex:1; min-width:0; }
-
-    .card {
-      background:var(--card);
-      border-radius:14px;
-      padding:14px;
-      border:1px solid var(--glass-border);
-      backdrop-filter: blur(8px) saturate(1.1);
-      box-shadow: 0 6px 30px rgba(2,6,23,0.45);
-    }
-
-    .videoWrap { display:flex;flex-direction:column;gap:12px; }
-    .videoFrame { width:100%; border-radius:12px; overflow:hidden; background:#000; }
-    .videoFrame iframe{ width:100%;height:520px;border:0;display:block; }
-
-    .statsRow{
-      display:flex;gap:12px;align-items:center;justify-content:space-between;
-      margin-top:8px;
-    }
-    .stat {
-      flex:1;
-      background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-      padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
-      display:flex;flex-direction:column;gap:6px;
-      min-width:0;
-    }
-    .stat .label{ font-size:12px;color:var(--muted); }
-    .stat .value{ font-size:18px;font-weight:700; transition: all 0.12s ease; }
-    .stat .smallNote{ font-size:12px;color:var(--muted); }
-
-    .channelRow{
-      display:flex;gap:8px;align-items:center;margin-bottom:12px;
-    }
-    select, input[type=text]{
-      background:transparent;border:1px solid var(--glass-border);padding:8px;border-radius:8px;color:inherit;
-      outline:none;
-    }
-    .btn { padding:8px 12px;border-radius:10px;border:none;cursor:pointer;background:var(--accent);color:white;font-weight:600; }
-    .btn.ghost { background:transparent;border:1px solid var(--glass-border); color:inherit;font-weight:600; }
-
-    .chatFrame{ width:100%; height:520px;border-radius:10px;border:none; }
-
-    .profile{ display:flex;gap:8px;align-items:center; }
-    .avatar{ width:36px;height:36px;border-radius:50%;overflow:hidden;background:#ddd; }
-    .avatar img{ width:100%;height:100%;object-fit:cover;display:block; }
-
-    @media (max-width:1000px){
-      main{ flex-direction:column; }
-      .videoFrame iframe, .chatFrame { height:420px; }
-      .stat .value{ font-size:16px; }
-    }
-    @media (max-width:520px){
-      .videoFrame iframe, .chatFrame { height:320px; }
-      header{ flex-direction:column; align-items:flex-start; gap:10px; }
-      .controls { width:100%; justify-content:space-between; }
-    }
-  </style>
+<style>
+:root{
+  --bg-1: #0d0f12;
+  --bg-2: linear-gradient(135deg,#0d0f12,#121215);
+  --card: rgba(255,255,255,0.06);
+  --accent: #ff3b7a;
+  --muted: rgba(255,255,255,0.7);
+  --glass-border: rgba(255,255,255,0.08);
+}
+[data-theme="light"]{
+  --bg-1: #f2f5f8;
+  --bg-2: linear-gradient(135deg,#f2f5f8,#e9eef4);
+  --card: rgba(22,28,36,0.03);
+  --accent: #ff0066;
+  --muted: rgba(0,0,0,0.6);
+  --glass-border: rgba(0,0,0,0.06);
+  color: #0b1220;
+}
+html,body{
+  height:100%;
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg-2);
+  color: white;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+.app { max-width:1200px; margin:18px auto; padding:18px; position:relative; }
+header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.brand { display:flex; gap:12px; align-items:center; }
+.logo { width:48px;height:48px;border-radius:10px;background:linear-gradient(180deg,#ff6b9e,#ff3b7a); display:flex;align-items:center;justify-content:center;font-weight:700; box-shadow:0 6px 24px rgba(255,59,122,0.18); color:white; }
+h1{ margin:0;font-size:20px;}
+p.subtitle{ margin:0;color:var(--muted); font-size:13px;}
+.controls { display:flex;gap:10px;align-items:center; }
+.small { display:flex;gap:8px;align-items:center; background:var(--card); padding:8px;border-radius:12px;border:1px solid var(--glass-border); box-shadow: 0 6px 18px rgba(2,6,23,0.5); }
+.small button { background:transparent;border:none;color:inherit;padding:6px 10px;border-radius:8px;cursor:pointer; }
+.small .accent { background:linear-gradient(90deg,var(--accent),#ff7aa6); color:white;padding:6px 10px;font-weight:600;border:none; }
+main { display:flex; gap:20px; align-items:flex-start; }
+.left { flex:3; min-width:0; position:relative; }
+.right { flex:1; min-width:0; }
+.card { background:var(--card); border-radius:14px; padding:14px; border:1px solid var(--glass-border); backdrop-filter: blur(8px) saturate(1.1); box-shadow: 0 6px 30px rgba(2,6,23,0.45); }
+.videoWrap { display:flex;flex-direction:column;gap:12px; }
+.videoFrame { width:100%; border-radius:12px; overflow:hidden; background:#000; position:relative; }
+.videoFrame iframe{ width:100%;height:520px;border:0;display:block; }
+.statsRow{ display:flex;gap:12px;align-items:center;justify-content:space-between; margin-top:8px; flex-wrap:wrap; }
+.stat { flex:1; min-width:100px; background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03); display:flex;flex-direction:column;gap:6px; }
+.stat .label{ font-size:12px;color:var(--muted); }
+.stat .value{ font-size:18px;font-weight:700; transition: all 0.12s ease; }
+.stat .smallNote{ font-size:12px;color:var(--muted); }
+.channelRow{ display:flex;gap:8px;align-items:center;margin-bottom:12px; }
+select, input[type=text]{ background:transparent;border:1px solid var(--glass-border);padding:8px;border-radius:8px;color:inherit; outline:none; }
+.btn { padding:8px 12px;border-radius:10px;border:none;cursor:pointer;background:var(--accent);color:white;font-weight:600; }
+.btn.ghost { background:transparent;border:1px solid var(--glass-border); color:inherit;font-weight:600; }
+.chatFrame{ width:100%; height:520px;border-radius:10px;border:none; }
+.profile{ display:flex;gap:8px;align-items:center; }
+.avatar{ width:36px;height:36px;border-radius:50%;overflow:hidden;background:#ddd; }
+.avatar img{ width:100%;height:100%;object-fit:cover;display:block; }
+@media (max-width:1000px){ main{ flex-direction:column; } .videoFrame iframe, .chatFrame { height:420px; } .stat .value{ font-size:16px; } }
+@media (max-width:520px){ .videoFrame iframe, .chatFrame { height:320px; } header{ flex-direction:column; align-items:flex-start; gap:10px; } .controls { width:100%; justify-content:space-between; } }
+footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center; }
+</style>
 </head>
 <body>
-  <div class="app" id="appRoot" data-theme="dark">
-    <header>
-      <div class="brand">
-        <div class="logo">YT</div>
-        <div>
-          <h1>YouTube Live Viewer</h1>
-          <p class="subtitle">Live video left • chat right • saved sign-in • nice UI</p>
-        </div>
-      </div>
-
-      <div class="controls">
-        <div class="small" id="signinBox">
-          <div id="g_id_onload"
-               data-client_id="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com"
-               data-context="signin"
-               data-callback="onGoogleSignIn"
-               data-auto_prompt="false"></div>
-          <div class="g_id_signin" data-type="standard"></div>
-        </div>
-
-        <div class="small" id="signedInfo" style="display:none;">
-          <div class="profile">
-            <div class="avatar" id="userAvatar"><img alt="user" src="" /></div>
-            <div style="min-width:120px;">
-              <div id="userName" style="font-weight:600;font-size:13px;"></div>
-              <div style="font-size:12px;color:var(--muted);" id="userEmail"></div>
-            </div>
-          </div>
-          <button class="small btn ghost" id="logoutBtn">Logout</button>
-        </div>
-      </div>
-    </header>
-
-    <main>
-      <!-- LEFT -->
-      <div class="left">
-        <div class="card">
-          <div class="channelRow">
-            <select id="channelSelect" style="min-width:220px;">
-              <option value="">— Choose saved channel —</option>
-            </select>
-            <input id="liveIdInput" type="text" placeholder="YouTube Live ID or URL (paste)" style="flex:1;" />
-            <button class="btn" id="loadBtn">Load</button>
-            <button class="btn ghost" id="saveChannelBtn">+ Save</button>
-          </div>
-
-          <div class="videoWrap">
-            <div class="videoFrame" id="videoFrame">
-              <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
-            </div>
-
-            <div class="statsRow" id="statsRow">
-              <div class="stat">
-                <div class="label">Views</div>
-                <div class="value" id="views">0</div>
-                <div class="smallNote">Total video views</div>
-              </div>
-
-              <!-- NEW: Total Chats -->
-              <div class="stat">
-                <div class="label">Total Chats</div>
-                <div class="value" id="totalChats">0</div>
-                <div class="smallNote">Messages received</div>
-              </div>
-
-              <div class="stat">
-                <div class="label">Watching Now</div>
-                <div class="value" id="watching">0</div>
-                <div class="smallNote">Concurrent viewers</div>
-              </div>
-              <div class="stat">
-                <div class="label">Live For</div>
-                <div class="value" id="duration">--:--:--</div>
-                <div class="smallNote">Time since start</div>
-              </div>
-              <div class="stat">
-                <div class="label">Likes</div>
-                <div class="value" id="likes">0</div>
-                <div class="smallNote">Total likes</div>
-              </div>
-              <div class="stat">
-                <div class="label">Chat Rate</div>
-                <div class="value" id="chatRate">0 / min</div>
-                <div class="smallNote">Messages per minute</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT -->
-      <div class="right">
-        <div class="card" style="display:flex;flex-direction:column;height:100%;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div style="font-weight:700;">Live Chat</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <label style="font-size:13px;color:var(--muted);">Theme</label>
-              <button id="themeToggle" class="btn ghost">🌙</button>
-            </div>
-          </div>
-
-          <div id="chatWrapper" style="position:relative;">
-            <iframe id="liveChat" class="chatFrame" src=""></iframe>
-          </div>
-
-          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:space-between;">
-            <div style="color:var(--muted);font-size:13px;">Chat updates every 5s • Stats UI updates every 0.1s</div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn ghost" id="addMsgsBtn">Clear saved channels</button>
-            </div>
-          </div>
-
-          <!-- Recommended lives under chat -->
-          <div id="recPanel" style="margin-top:12px;">
-            <div style="font-weight:700;margin-bottom:6px;">Recommended Live Streams</div>
-            <div id="recList" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;"></div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <footer>
-      Note: API key and client id are used client-side. For production move requests to a backend.
-    </footer>
+<div class="app" id="appRoot" data-theme="dark">
+<header>
+<div class="brand">
+  <div class="logo">YT</div>
+  <div>
+    <h1>YouTube Live Viewer</h1>
+    <p class="subtitle">Live video left • chat right • saved sign-in • nice UI</p>
   </div>
+</div>
+<div class="controls">
+  <div class="small" id="signinBox">
+    <div id="g_id_onload"
+         data-client_id="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com"
+         data-context="signin"
+         data-callback="onGoogleSignIn"
+         data-auto_prompt="false"></div>
+    <div class="g_id_signin" data-type="standard"></div>
+  </div>
+  <div class="small" id="signedInfo" style="display:none;">
+    <div class="profile">
+      <div class="avatar" id="userAvatar"><img alt="user" src="" /></div>
+      <div style="min-width:120px;">
+        <div id="userName" style="font-weight:600;font-size:13px;"></div>
+        <div style="font-size:12px;color:var(--muted);" id="userEmail"></div>
+      </div>
+    </div>
+    <button class="small btn ghost" id="logoutBtn">Logout</button>
+  </div>
+</div>
+</header>
+
+<main>
+<div class="left">
+  <div class="card">
+    <div class="channelRow">
+      <select id="channelSelect" style="min-width:220px;">
+        <option value="">— Choose saved channel —</option>
+      </select>
+      <input id="liveIdInput" type="text" placeholder="YouTube Live ID or URL (paste)" style="flex:1;" />
+      <button class="btn" id="loadBtn">Load</button>
+      <button class="btn ghost" id="saveChannelBtn">+ Save</button>
+    </div>
+    <div class="videoWrap">
+      <div class="videoFrame" id="videoFrame">
+        <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
+      </div>
+      <div class="statsRow" id="statsRow">
+        <div class="stat">
+          <div class="label">Views</div>
+          <div class="value" id="views">0</div>
+          <div class="smallNote">Total video views</div>
+        </div>
+        <div class="stat">
+          <div class="label">Watching Now</div>
+          <div class="value" id="watching">0</div>
+          <div class="smallNote">Concurrent viewers</div>
+        </div>
+        <div class="stat">
+          <div class="label">Live For</div>
+          <div class="value" id="duration">--:--:--</div>
+          <div class="smallNote">Time since start</div>
+        </div>
+        <div class="stat">
+          <div class="label">Likes</div>
+          <div class="value" id="likes">0</div>
+          <div class="smallNote">Total likes</div>
+        </div>
+        <div class="stat">
+          <div class="label">Chat Rate</div>
+          <div class="value" id="chatRate">0 / min</div>
+          <div class="smallNote">Messages per minute</div>
+        </div>
+        <div class="stat">
+          <div class="label">Total Chats</div>
+          <div class="value" id="totalChats">0</div>
+          <div class="smallNote" id="userChats">Your chats: 0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="right">
+  <div class="card" style="display:flex;flex-direction:column;height:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-weight:700;">Live Chat</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:13px;color:var(--muted);">Theme</label>
+        <button id="themeToggle" class="btn ghost">🌙</button>
+      </div>
+    </div>
+    <div id="chatWrapper" style="position:relative;">
+      <iframe id="liveChat" class="chatFrame" src=""></iframe>
+    </div>
+    <div id="recPanel" style="margin-top:10px;">
+      <div style="font-weight:700;margin-bottom:6px;">Recommended Live Streams</div>
+      <div id="recList" class="recList" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer>Note: API key and client id are used client-side. For production move requests to a backend.</footer>
+</div>
 
 <script>
 const CLIENT_ID = "901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com";
 const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
-
 let LIVE_ID = "";
 let statsCache = { views:0, watching:0, likes:0, startTime:null };
 let chatTimestamps = [];
@@ -293,6 +187,21 @@ let chatPageToken = null;
 let chatPollingInterval = null;
 let videoStatsInterval = null;
 let uiUpdateInterval = null;
+let signedInUser = null;
+let userChatCount = 0;
+
+const liveVideo = document.getElementById('liveVideo');
+const liveChat = document.getElementById('liveChat');
+const loadBtn = document.getElementById('loadBtn');
+const saveChannelBtn = document.getElementById('saveChannelBtn');
+const liveIdInput = document.getElementById('liveIdInput');
+const channelSelect = document.getElementById('channelSelect');
+const viewsEl = document.getElementById('views');
+const watchingEl = document.getElementById('watching');
+const durationEl = document.getElementById('duration');
+const likesEl = document.getElementById('likes');
+const chatRateEl = document.getElementById('chatRate');
+const totalChatsEl = document.getElementById('totalChats');
 
 function parseLiveId(input){
   if(!input) return "";
@@ -306,37 +215,15 @@ function parseLiveId(input){
     return parts.pop() || parts.pop();
   }catch(e){ return input; }
 }
-
 function formatTime(seconds){
   const h = String(Math.floor(seconds/3600)).padStart(2,'0');
   const m = String(Math.floor((seconds%3600)/60)).padStart(2,'0');
   const s = String(seconds%60).padStart(2,'0');
   return `${h}:${m}:${s}`;
 }
-
-/* UI refs */
-const liveVideo = document.getElementById('liveVideo');
-const liveChat = document.getElementById('liveChat');
-const loadBtn = document.getElementById('loadBtn');
-const saveChannelBtn = document.getElementById('saveChannelBtn');
-const liveIdInput = document.getElementById('liveIdInput');
-const channelSelect = document.getElementById('channelSelect');
-const viewsEl = document.getElementById('views');
-const totalChatsEl = document.getElementById('totalChats');
-const watchingEl = document.getElementById('watching');
-const durationEl = document.getElementById('duration');
-const likesEl = document.getElementById('likes');
-const chatRateEl = document.getElementById('chatRate');
-const recList = document.getElementById('recList');
-
-/* Local storage */
 function saveToLocal(key,value){ localStorage.setItem(key, JSON.stringify(value)); }
 function loadFromLocal(key,fallback=null){ try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; } }
-
-function loadSavedChannels(){
-  const saved = loadFromLocal('yt_saved_channels', []);
-  populateChannelSelect(saved);
-}
+function loadSavedChannels(){ populateChannelSelect(loadFromLocal('yt_saved_channels', [])); }
 function populateChannelSelect(list){
   channelSelect.innerHTML = '<option value="">— Choose saved channel —</option>';
   list.forEach(item=>{
@@ -354,21 +241,15 @@ function addSavedChannel(id,title){
   saveToLocal('yt_saved_channels',list);
   populateChannelSelect(list);
 }
-
 channelSelect.addEventListener('change', ()=>{
   const val = channelSelect.value;
-  if(val){
-    liveIdInput.value = val;
-    startViewing(val);
-  }
+  if(val){ liveIdInput.value = val; startViewing(val); }
 });
-
 loadBtn.addEventListener('click', ()=>{
   const id = parseLiveId(liveIdInput.value);
   if(!id) return alert('Enter a live ID or paste a YouTube URL.');
   startViewing(id);
 });
-
 saveChannelBtn.addEventListener('click', async ()=>{
   if(!LIVE_ID) return alert('Load a live first.');
   try{
@@ -383,31 +264,21 @@ saveChannelBtn.addEventListener('click', async ()=>{
   }
 });
 
-/* -------------------------
-   Video & chat polling
-------------------------- */
 async function startViewing(newId){
   stopPolling();
   LIVE_ID = newId;
-
   liveVideo.src = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
   liveChat.src = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
-
-  chatTimestamps = [];
-  chatPageToken = null;
+  chatTimestamps = []; chatPageToken = null;
   statsCache = { views:0, watching:0, likes:0, startTime:null };
-  totalChatsEl.innerText = 0;
-
+  userChatCount = 0;
+  document.getElementById('userChats').innerText = 'Your chats: 0';
   const info = await fetchVideoInfo(LIVE_ID);
-  if(!info){ alert('Could not load video info — ensure the ID is correct.'); return; }
-
+  if(!info){ alert('Could not load video info.'); return; }
+  await updateStatsFromVideoInfo(info);
+  videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
   const liveDetails = info.liveStreamingDetails || {};
   const liveChatId = liveDetails.activeLiveChatId || null;
-  if(!liveChatId) console.warn('No activeLiveChatId found; chat rate will be N/A.');
-
-  await updateStatsFromVideoInfo(info);
-
-  videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
   chatPollingInterval = setInterval(()=>{ if(liveChatId) fetchChatMessages(liveChatId); },5000);
   uiUpdateInterval = setInterval(updateStatDisplay,100);
   fetchRecommendedLiveStreams(info?.snippet?.title || '');
@@ -422,7 +293,6 @@ async function fetchVideoInfo(videoId){
     return null;
   }catch(e){ console.error('fetchVideoInfo', e); return null; }
 }
-
 async function updateStatsFromVideoInfo(info){
   const stats = info.statistics || {};
   const live = info.liveStreamingDetails || {};
@@ -431,12 +301,10 @@ async function updateStatsFromVideoInfo(info){
   statsCache.watching = Number(live.concurrentViewers||0);
   statsCache.startTime = live.actualStartTime ? new Date(live.actualStartTime) : null;
 }
-
 async function fetchAndUpdateVideoStats(){
   if(!LIVE_ID) return;
   try{ const info = await fetchVideoInfo(LIVE_ID); if(info) await updateStatsFromVideoInfo(info); }catch(e){ console.error(e); }
 }
-
 async function fetchChatMessages(liveChatId){
   const base = `https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=${encodeURIComponent(liveChatId)}&key=${API_KEY}&maxResults=200`;
   const url = chatPageToken ? base+'&pageToken='+chatPageToken : base;
@@ -450,15 +318,18 @@ async function fetchChatMessages(liveChatId){
     items.forEach(item=>{
       const t = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt).getTime() : now;
       chatTimestamps.push(t);
+      if(signedInUser && item.authorDetails?.displayName === signedInUser){
+        userChatCount++;
+      }
     });
     chatTimestamps = chatTimestamps.filter(ts=>ts>=Date.now()-60000);
-
     totalChatsEl.innerText = Number(totalChatsEl.innerText || 0) + items.length;
-  }catch(e){ console.error(e); }
+    if(signedInUser) document.getElementById('userChats').innerText = `Your chats: ${userChatCount}`;
+}
+catch(e){ console.error(e); }
 }
 
 function computeChatRate(){ return chatTimestamps.filter(ts=>ts>=Date.now()-60000).length; }
-
 function updateStatDisplay(){
   viewsEl.innerText = statsCache.views.toLocaleString();
   watchingEl.innerText = statsCache.watching.toLocaleString();
@@ -473,18 +344,16 @@ function stopPolling(){
   if(uiUpdateInterval){ clearInterval(uiUpdateInterval); uiUpdateInterval=null; }
 }
 
-/* -------------------------
-   Recommended live streams
-------------------------- */
 async function fetchRecommendedLiveStreams(title){
-  if(!title){ recList.innerHTML='<div>No title for recommendations</div>'; return; }
-  recList.innerHTML='<div>Loading recommended live streams…</div>';
+  if(!title){ document.getElementById('recList').innerHTML='<div>No title for recommendations</div>'; return; }
+  document.getElementById('recList').innerHTML='<div>Loading recommended live streams…</div>';
   try{
     const q = encodeURIComponent(title+' live');
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&q=${q}&key=${API_KEY}&maxResults=8`;
     const res = await fetch(url);
     const json = await res.json();
-    if(!json?.items?.length){ recList.innerHTML='<div>No live recommendations found</div>'; return; }
+    if(!json?.items?.length){ document.getElementById('recList').innerHTML='<div>No live recommendations found</div>'; return; }
+    const recList = document.getElementById('recList');
     recList.innerHTML='';
     json.items.forEach(it=>{
       const vid=it.id.videoId;
@@ -493,15 +362,24 @@ async function fetchRecommendedLiveStreams(title){
       const titleText = snip.title || vid;
       const channel = snip.channelTitle || '';
       const item = document.createElement('div');
-      item.style.display='flex'; item.style.gap='6px'; item.style.cursor='pointer';
-      item.innerHTML = `<img src="${thumb}" alt="thumb" width="84" height="48" style="border-radius:6px;flex-shrink:0;"><div style="display:flex;flex-direction:column;overflow:hidden;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(titleText)}</div><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(channel)} • Live</div></div>`;
+      item.style.display='flex'; item.style.gap='8px'; item.style.cursor='pointer';
+      item.innerHTML = `<img src="${thumb}" width="84" height="48" style="object-fit:cover;border-radius:6px;" /><div><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${titleText}</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${channel} • Live</div></div>`;
       item.addEventListener('click', ()=> { liveIdInput.value=vid; startViewing(vid); });
       recList.appendChild(item);
     });
-  }catch(e){ console.error(e); recList.innerHTML='<div>Error fetching recommendations</div>'; }
+  }catch(e){ console.error(e); document.getElementById('recList').innerHTML='<div>Error fetching recommendations</div>'; }
 }
 
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Google Sign-In callback
+function onGoogleSignIn(googleUser){
+  const profile = googleUser.getBasicProfile();
+  signedInUser = profile.getName();
+  userChatCount = 0;
+  document.getElementById('userName').innerText = signedInUser;
+  document.getElementById('userChats').innerText = 'Your chats: 0';
+  document.getElementById('signedInfo').style.display='flex';
+  document.getElementById('signinBox').style.display='none';
+}
 </script>
 </body>
 </html>
