@@ -1,333 +1,89 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>YouTube Title/Description Optimizer + Predicted Analytics</title>
-<style>
-:root{--bg:#f8fafc;--card:#fff;--muted:#64748b}
-body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:18px;background:var(--bg);color:#0f172a}
-.wrap{max-width:980px;margin:12px auto}
-h1{font-size:20px;margin:6px 0}
-label{display:block;margin-top:12px;font-weight:700;color:var(--muted)}
-input,button,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6eef6;background:var(--card)}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.col{flex:1}
-.card{background:var(--card);padding:12px;border-radius:12px;border:1px solid #e6eef6;margin-top:12px}
-.muted{color:var(--muted)}
-.ok{color:green}.warn{color:orange}.err{color:red}
-img.thumb{max-width:320px;border-radius:8px;margin-top:8px}
-pre{background:#0b1220;color:#e6eef6;padding:10px;border-radius:8px;overflow:auto}
-.btn-inline{display:inline-block;padding:8px 12px;border-radius:8px;background:#0ea5a9;color:white;border:none;cursor:pointer;margin:3px}
-.btn-selected{background:#facc15;color:#0f172a;}
-.small{font-size:13px;color:var(--muted)}
-table{border-collapse:collapse;width:100%;margin-top:12px}
-th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
-</style>
+  <title>YouTube Live Viewer w/ Google Sign-In</title>
+  <meta name="google-signin-client_id" content="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    body { font-family: Arial; background:#111; color:white; padding:20px; }
+    #playerArea, #chatArea { display:none; margin-top:20px; }
+    #signinDiv { margin-top:30px; }
+    input { padding:10px; width:250px; border-radius:6px; border:none; }
+    button { padding:10px 20px; border:none; border-radius:6px; cursor:pointer; }
+    iframe { border:none; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-<h1>YouTube Trend-Based Optimizer + Predicted Analytics</h1>
 
-<!-- AUTH CARD -->
-<div class="card">
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <div style="flex:1;min-width:220px">
-      <label>OAuth Client ID</label>
-      <input id="clientId" placeholder="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" value="ENTER_YOUR_CLIENT_ID.apps.googleusercontent.com" />
-      <div class="small">Google Cloud → OAuth 2.0 Client ID (Web app). Add this page origin as Authorized JS origin.</div>
-    </div>
-    <div style="min-width:220px"><label>&nbsp;</label><button id="authBtn" class="btn-inline">Sign in / Grant Access</button></div>
-    <div style="min-width:220px"><label>&nbsp;</label><button id="signoutBtn" class="btn-inline" style="background:#ef4444">Sign out</button></div>
-  </div>
-  <div id="authStatus" class="small muted" style="margin-top:8px">Not signed in</div>
+<h2>YouTube Live Viewer</h2>
+
+<div id="liveSelect">
+  <p>Enter the YouTube **Live Video ID** you want to watch:</p>
+  <input id="liveIdInput" placeholder="e.g. wXhTHyIgQ_U">
+  <button onclick="saveLiveId()">Load Live</button>
 </div>
 
-<!-- VIDEO LINK MODE -->
-<div class="card">
-  <label>Video URL or ID</label>
-  <input id="videoInput" placeholder="https://youtu.be/XXXXX or /shorts/XXXXX or video id" />
-  <div class="row" style="margin-top:10px">
-    <div class="col"><button id="analyzeBtn" class="btn-inline">Analyze</button></div>
-    <div class="col"><button id="clearBtn" class="btn-inline" style="background:#6b7280">Clear</button></div>
+<div id="signinDiv" style="margin-top:30px;">
+  <h3>Sign in to continue</h3>
+  <div id="g_id_onload"
+       data-client_id="901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com"
+       data-context="signin"
+       data-callback="onGoogleSignIn"
+       data-auto_prompt="false">
   </div>
-  <div id="warnings" class="small muted" style="margin-top:8px"></div>
+
+  <div class="g_id_signin" data-type="standard"></div>
 </div>
 
-<!-- MANUAL MODE -->
-<div class="card">
-  <h3>Or Upload Thumbnail + Enter Info</h3>
-  <label>Thumbnail Upload</label>
-  <input type="file" id="thumbUpload" accept="image/*" />
-  <img id="uploadedThumb" class="thumb" style="display:none">
-
-  <label>Video Name</label>
-  <input id="manualTitle" placeholder="Enter a video name..." />
-
-  <label>Description</label>
-  <textarea id="manualDesc" placeholder="Describe your video..."></textarea>
-
-  <button id="generateTitleBtn" class="btn-inline">Find Good Titles</button>
-  <button id="enhanceThumbBtn" class="btn-inline" style="background:#3b82f6">Enhance Thumbnail</button>
-  <img id="enhancedThumb" class="thumb" style="display:none">
+<!-- VIDEO AREA -->
+<div id="playerArea">
+  <h3>Live Video</h3>
+  <iframe id="liveVideo" width="800" height="450"></iframe>
 </div>
 
-<!-- RESULTS -->
-<div id="results" style="display:none">
-  <div class="card">
-    <h3>Summary</h3>
-    <div id="summary"></div>
-  </div>
-
-  <div class="card">
-    <h3>Metadata</h3>
-    <div id="meta"></div>
-  </div>
-
-  <div class="card">
-    <h3>Analytics</h3>
-    <div id="analytics"></div>
-  </div>
-
-  <div class="card">
-    <h3>Select Title</h3>
-    <div id="titles"></div>
-  </div>
-
-  <div class="card">
-    <h3>Select Description</h3>
-    <div id="descriptions"></div>
-  </div>
-
-  <div class="card">
-    <h3>Predicted Performance</h3>
-    <div id="prediction"></div>
-  </div>
-
-  <div class="card">
-    <h3>Raw JSON</h3>
-    <pre id="raw"></pre>
-  </div>
-</div>
+<!-- CHAT AREA -->
+<div id="chatArea">
+  <h3>Live Chat</h3>
+  <iframe id="liveChat" width="400" height="450"></iframe>
 </div>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-const SCOPES = [
-  'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/yt-analytics.readonly'
-].join(' ');
+let LIVE_ID = null;
+const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
 
-let tokenClient=null, accessToken=null, tokenExpiresAt=null, currentClientId='';
-const el=id=>document.getElementById(id);
-let selectedTitle=null, selectedDescription=null;
-
-el('authBtn').addEventListener('click',()=>{
-  currentClientId=el('clientId').value.trim();
-  if(!currentClientId||currentClientId.startsWith('ENTER_')){alert('Enter OAuth Client ID');return;}
-  initTokenClient(currentClientId);
-  tokenClient.requestAccessToken({prompt:'consent'});
-});
-
-el('signoutBtn').addEventListener('click',()=>{accessToken=null;tokenExpiresAt=null;window.localStorage.removeItem('yt_aud_token');updateAuthUI();el('warnings').textContent='Signed out';});
-function updateAuthUI(){el('authStatus').innerHTML=(accessToken&&tokenExpiresAt&&Date.now()<tokenExpiresAt)?'Signed in — token valid until '+new Date(tokenExpiresAt).toLocaleString():'Not signed in / token expired';}
-
-function initTokenClient(clientId){
-  if(tokenClient&&currentClientId===clientId)return;
-  tokenClient=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:SCOPES,callback:resp=>{
-    if(resp.error){el('warnings').textContent='Token error: '+(resp.error_description||resp.error);return;}
-    accessToken=resp.access_token;
-    tokenExpiresAt=Date.now()+(resp.expires_in?resp.expires_in*1000:(60*60*1000));
-    window.localStorage.setItem('yt_aud_token',JSON.stringify({token:accessToken,expiresAt:tokenExpiresAt}));
-    updateAuthUI();
-    el('warnings').textContent='Access token acquired.';}});
+function saveLiveId() {
+  LIVE_ID = document.getElementById("liveIdInput").value.trim();
+  if (!LIVE_ID) return alert("Please enter a live ID.");
+  alert("Live ID saved. Now sign in.");
 }
 
-(function restoreToken(){try{const saved=JSON.parse(window.localStorage.getItem('yt_aud_token')||'null');if(saved&&saved.token&&saved.expiresAt&&Date.now()<saved.expiresAt){accessToken=saved.token;tokenExpiresAt=saved.expiresAt;updateAuthUI();}}catch(e){};})();
-
-function extractVideoId(input){if(!input)return null;input=input.trim();const re=/(?:v=|\/videos\/|embed\/|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{11})/;const m=input.match(re);if(m)return m[1];if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;return null;}
-
-// -------------------- VIDEO LINK ANALYSIS --------------------
-el('analyzeBtn').addEventListener('click',async()=>{
-  el('warnings').textContent='';el('results').style.display='none';
-  const raw=el('videoInput').value.trim();
-  const vid=extractVideoId(raw);if(!vid){el('warnings').textContent='Invalid video ID';return;}
-  if(!accessToken){el('warnings').textContent='No access token';return;}
-  try{
-    const videoUrl=`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}`;
-    const metaResp=await fetchWithAuth(videoUrl);
-    if(!metaResp.ok)throw new Error('videos.list failed: '+metaResp.status);
-    const metaJson=await metaResp.json();if(!metaJson.items||metaJson.items.length===0){el('warnings').textContent='Video not found';return;}
-    const item=metaJson.items[0];
-
-    const end=new Date(),start=new Date();start.setDate(end.getDate()-90);
-    const startStr=start.toISOString().slice(0,10),endStr=end.toISOString().slice(0,10);
-    const metrics=encodeURIComponent('views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage');
-    const filters=encodeURIComponent(`video==${vid}`),ids=encodeURIComponent('channel==MINE');
-    const analyticsUrl=`https://youtubeanalytics.googleapis.com/v2/reports?metrics=${metrics}&dimensions=&startDate=${startStr}&endDate=${endStr}&ids=${ids}&filters=${filters}`;
-    const analyticsResp=await fetchWithAuth(analyticsUrl);
-    const analyticsJson=analyticsResp.ok?await analyticsResp.json():{error:await analyticsResp.text()};
-
-    renderResults(item,analyticsJson,{startDate:startStr,endDate:endStr});
-    const suggestions=await generateTrendBasedSuggestions(item.snippet.title);
-    renderSuggestions(suggestions);
-    el('raw').textContent=JSON.stringify({meta:metaJson,analytics:analyticsJson},null,2);
-  }catch(err){console.error(err);el('warnings').textContent='Error: '+(err.message||err);}
-});
-
-el('clearBtn').addEventListener('click',()=>{el('videoInput').value='';el('results').style.display='none';el('warnings').textContent='';el('raw').textContent='';el('titles').innerHTML='';el('descriptions').innerHTML='';el('prediction').innerHTML='';selectedTitle=null;selectedDescription=null;});
-
-async function fetchWithAuth(url){return fetch(url,{headers:{Authorization:'Bearer '+accessToken}});}
-
-function renderResults(metaItem,analyticsJson,meta){
-  el('results').style.display='block';
-  const snip=metaItem.snippet||{},stats=metaItem.statistics||{},contentDetails=metaItem.contentDetails||{};
-  const isShort=isShortDuration(contentDetails.duration);
-  el('summary').innerHTML=`<strong>Title:</strong> ${escapeHtml(snip.title||'')}<br><strong>Video ID:</strong> ${metaItem.id}<br><strong>Type:</strong> ${isShort?'Short (<=60s)':'Regular video'}<br><strong>Date range:</strong> ${meta.startDate} → ${meta.endDate}`;
-  const thumb=(snip.thumbnails&&(snip.thumbnails.maxres||snip.thumbnails.high||snip.thumbnails.medium||snip.thumbnails.default));
-  el('meta').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><strong>Title</strong><br>${escapeHtml(snip.title||'')}<br><br><strong>Description</strong><br>${escapeHtml((snip.description||'').slice(0,200))}</div><div style="min-width:320px"><strong>Thumbnail</strong><br>${thumb?`<img class="thumb" src="${thumb.url}">`:'<div class="warn">No thumbnail</div>'}</div></div><div style="margin-top:12px"><strong>Stats:</strong> Views: ${stats.viewCount||0} • Likes: ${stats.likeCount||0} • Comments: ${stats.commentCount||0}</div>`;
-  let analyticsHtml='';
-  if(analyticsJson&&analyticsJson.rows&&analyticsJson.rows.length>0){
-    const row=analyticsJson.rows[0];const metrics=analyticsJson.columnHeaders?analyticsJson.columnHeaders.map(h=>h.name):[];
-    const map={};for(let i=0;i<metrics.length;i++)map[metrics[i]]=row[i];
-    analyticsHtml+=`<div><strong>Views:</strong> ${map.views||0}</div><div><strong>Avg View Duration (s):</strong> ${map.averageViewDuration||0}</div><div><strong>Avg View %:</strong> ${map.averageViewPercentage||0}</div><div><strong>Est. Minutes Watched:</strong> ${map.estimatedMinutesWatched||0}</div>`;
-  }else if(analyticsJson&&analyticsJson.error){analyticsHtml+=`<div class="err">Analytics error: ${escapeHtml(typeof analyticsJson.error==='string'?analyticsJson.error:JSON.stringify(analyticsJson.error))}</div>`;}
-  else{analyticsHtml+=`<div class="warn">No analytics data returned.</div>`;}
-  el('analytics').innerHTML=analyticsHtml;
-}
-
-// -------------------- TREND SUGGESTIONS --------------------
-async function generateTrendBasedSuggestions(originalTitle){
-  if(!originalTitle)return{titles:[],descriptions:[],hashtags:[]};
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(originalTitle)}&order=viewCount`;
-  const searchResp=await fetchWithAuth(searchUrl);
-  if(!searchResp.ok)return{titles:[],descriptions:[],hashtags:[]};
-  const searchJson=await searchResp.json();
-  const videos=searchJson.items||[];
-  let trendTitles=[],trendDescriptions=[],trendTags=[];
-  for(let v of videos){trendTitles.push(v.snippet.title);trendDescriptions.push(v.snippet.description.slice(0,200));if(v.snippet.tags)trendTags.push(...v.snippet.tags);}
-  const revampedTitles=trendTitles.slice(0,10);
-  const revampedDescriptions=trendDescriptions.slice(0,10);
-  return {titles:revampedTitles,descriptions:revampedDescriptions,hashtags:trendTags};
-}
-
-function renderSuggestions(suggestions){renderSuggestionButtons(suggestions.titles,suggestions.descriptions);}
-
-// -------------------- MANUAL INPUT MODE --------------------
-el('thumbUpload').addEventListener('change', e=>{
-  const file=e.target.files[0];
-  if(file){
-    const reader=new FileReader();
-    reader.onload=()=>{el('uploadedThumb').src=reader.result;el('uploadedThumb').style.display='block';};
-    reader.readAsDataURL(file);
+// Google sign-in callback
+function onGoogleSignIn(response) {
+  if (!LIVE_ID) {
+    alert("Enter a live ID first!");
+    return;
   }
-});
 
-el('generateTitleBtn').addEventListener('click', async ()=>{
-  const title=el('manualTitle').value.trim();
-  const desc=el('manualDesc').value.trim();
-  if(!title && !desc){alert('Enter at least a name or description');return;}
-  if(!accessToken){alert('You must sign in first.');return;}
-  el('results').style.display='block';
-  el('warnings').textContent='Generating YouTube title suggestions...';
-  const query=encodeURIComponent(title || desc);
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${query}&order=viewCount`;
-  const resp=await fetchWithAuth(searchUrl);
-  const json=await resp.json();
-  const trendTitles=json.items.map(v=>v.snippet.title);
-  const trendDescs=json.items.map(v=>v.snippet.description.slice(0,200));
-  renderSuggestionButtons(trendTitles,trendDescs);
-  el('warnings').textContent='Suggestions loaded from trending YouTube videos.';
-});
+  // Hide sign-in UI
+  document.getElementById("signinDiv").style.display = "none";
+  document.getElementById("liveSelect").style.display = "none";
 
-// -------------------- ENHANCE THUMBNAIL --------------------
-el('enhanceThumbBtn').addEventListener('click', async () => {
-  const title = el('manualTitle').value.trim();
-  const desc = el('manualDesc').value.trim();
-  if (!title && !desc) { alert('Enter at least a name or description to enhance thumbnail.'); return; }
-  el('warnings').textContent = 'Enhancing thumbnail based on title and description...';
+  // Show player + chat
+  document.getElementById("playerArea").style.display = "block";
+  document.getElementById("chatArea").style.display = "block";
 
-  try {
-    const query = encodeURIComponent(title || desc);
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}&order=viewCount`;
-    const resp = await fetchWithAuth(searchUrl);
-    const json = await resp.json();
-    const videos = json.items || [];
-
-    let bestThumb = '';
-    for (let v of videos) {
-      if (v.snippet.thumbnails?.maxres) { bestThumb = v.snippet.thumbnails.maxres.url; break; }
-      if (v.snippet.thumbnails?.high) { bestThumb = v.snippet.thumbnails.high.url; break; }
-    }
-
-    if (!bestThumb) { bestThumb = 'https://via.placeholder.com/320x180?text=Thumbnail+Suggestion'; el('warnings').textContent='No suitable thumbnail found. Using placeholder.'; }
-    else { el('warnings').textContent='Thumbnail enhanced successfully!'; }
-
-    el('enhancedThumb').src = bestThumb;
-    el('enhancedThumb').style.display = 'block';
-
-  } catch (err) { console.error(err); el('warnings').textContent = 'Error enhancing thumbnail: ' + (err.message || err); }
-});
-
-function renderSuggestionButtons(titles,descriptions){
-  el('titles').innerHTML='';el('descriptions').innerHTML='';
-  let titleIndex=0,descIndex=0,batchSize=5;
-
-  const renderTitles=()=>{
-    const end=Math.min(titleIndex+batchSize,titles.length);
-    for(let i=titleIndex;i<end;i++){
-      const btn=document.createElement('button');
-      btn.textContent=titles[i];
-      btn.className='btn-inline';
-      btn.onclick=()=>{selectedTitle=titles[i];updatePrediction();updateButtons(el('titles'),btn);};
-      el('titles').appendChild(btn);
-    }
-    titleIndex=end;
-  };
-
-  const renderDescs=()=>{
-    const end=Math.min(descIndex+batchSize,descriptions.length);
-    for(let i=descIndex;i<end;i++){
-      const btn=document.createElement('button');
-      btn.textContent=descriptions[i];
-      btn.className='btn-inline';
-      btn.onclick=()=>{selectedDescription=descriptions[i];updatePrediction();updateButtons(el('descriptions'),btn);};
-      el('descriptions').appendChild(btn);
-    }
-    descIndex=end;
-  };
-
-  renderTitles();renderDescs();
-
-  const loadMoreTitles=document.createElement('button');
-  loadMoreTitles.textContent='Load More Titles';
-  loadMoreTitles.className='btn-inline';
-  loadMoreTitles.onclick=()=>renderTitles();
-  el('titles').appendChild(loadMoreTitles);
-
-  const loadMoreDescs=document.createElement('button');
-  loadMoreDescs.textContent='Load More Descriptions';
-  loadMoreDescs.className='btn-inline';
-  loadMoreDescs.onclick=()=>renderDescs();
-  el('descriptions').appendChild(loadMoreDescs);
+  loadLiveEmbed();
 }
 
-// -------------------- PREDICTION --------------------
-async function updatePrediction(){
-  if(!selectedTitle||!selectedDescription){el('prediction').innerHTML='Pick a title and description to see predicted performance.';return;}
-  el('prediction').innerHTML='Calculating...';
-  const query=encodeURIComponent(selectedTitle);
-  const searchUrl=`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${query}`;
-  const resp=await fetchWithAuth(searchUrl);
-  const json=await resp.json();
-  const avgViews=Math.floor(Math.random()*50000)+1000;
-  const avgEngagement=Math.random()*10+1;
-  el('prediction').innerHTML=`<strong>Title:</strong> ${escapeHtml(selectedTitle)}<br><strong>Description:</strong> ${escapeHtml(selectedDescription.slice(0,150))}...<br><br><strong>Predicted Views:</strong> ${avgViews.toLocaleString()}<br><strong>Predicted Engagement Rate:</strong> ${avgEngagement.toFixed(2)}%`;
-}
+function loadLiveEmbed() {
+  const videoURL = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
+  const chatURL = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
 
-function updateButtons(container,selectedBtn){for(let b of container.querySelectorAll('button'))b.classList.remove('btn-selected');selectedBtn.classList.add('btn-selected');}
-function isShortDuration(duration){if(!duration)return false;const m=duration.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);const mins=parseInt(m?.[1]||0),secs=parseInt(m?.[2]||0);return mins*60+secs<=60;}
-function escapeHtml(str){return str.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+  document.getElementById("liveVideo").src = videoURL;
+  document.getElementById("liveChat").src = chatURL;
+}
 </script>
+
 </body>
 </html>
