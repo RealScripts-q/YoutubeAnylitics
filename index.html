@@ -51,8 +51,9 @@ main { display:flex; gap:20px; align-items:flex-start; }
 .right { flex:1; min-width:0; }
 .card { background:var(--card); border-radius:14px; padding:14px; border:1px solid var(--glass-border); backdrop-filter: blur(8px) saturate(1.1); box-shadow: 0 6px 30px rgba(2,6,23,0.45); }
 .videoWrap { display:flex;flex-direction:column;gap:12px; }
-.videoFrame { width:100%; border-radius:12px; overflow:hidden; background:#000; position:relative; }
-.videoFrame iframe{ width:100%;height:520px;border:0;display:block; }
+.videoFrame { display:flex;flex-direction:column;gap:8px; }
+.videoFrameInner { width:100%; border-radius:12px; overflow:hidden; background:#000; position:relative; }
+.videoFrameInner iframe{ width:100%;height:520px;border:0;display:block; }
 .statsRow{ display:flex;gap:12px;align-items:center;justify-content:space-between; margin-top:8px; flex-wrap:wrap; }
 .stat { flex:1; min-width:100px; background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03); display:flex;flex-direction:column;gap:6px; }
 .stat .label{ font-size:12px;color:var(--muted); }
@@ -66,26 +67,32 @@ select, input[type=text]{ background:transparent;border:1px solid var(--glass-bo
 .profile{ display:flex;gap:8px;align-items:center; }
 .avatar{ width:36px;height:36px;border-radius:50%;overflow:hidden;background:#ddd; }
 .avatar img{ width:100%;height:100%;object-fit:cover;display:block; }
+.pipBtn { padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:transparent;font-size:16px; }
+.recordBadge { display:inline-block;padding:4px 8px;border-radius:8px;background: rgba(255,0,70,0.14);color:var(--accent);font-weight:700;font-size:12px;margin-left:8px; }
 @media (max-width:1000px){ main{ flex-direction:column; } .videoFrame iframe, .chatFrame { height:420px; } .stat .value{ font-size:16px; } }
 @media (max-width:520px){ .videoFrame iframe, .chatFrame { height:320px; } header{ flex-direction:column; align-items:flex-start; gap:10px; } .controls { width:100%; justify-content:space-between; } }
 footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center; }
 
-/* === PICTURE-IN-PICTURE CHAT WINDOW === */
-#chatPIP {
+/* Floating mini chat (draggable) - fallback if user wants inline float */
+.floatingChat {
   position:fixed;
-  bottom:20px;
-  right:20px;
-  width:350px;
-  height:500px;
-  background:var(--card);
-  border:1px solid var(--glass-border);
-  border-radius:12px;
-  backdrop-filter: blur(10px);
-  box-shadow:0 8px 32px rgba(0,0,0,0.45);
-  display:none;
-  z-index:999999;
+  right:18px;
+  bottom:18px;
+  width:320px;
+  height:420px;
+  border-radius:10px;
   overflow:hidden;
+  z-index:99999;
+  border:1px solid var(--glass-border);
+  box-shadow: 0 20px 60px rgba(2,6,23,0.6);
+  background:var(--card);
+  display:flex;
+  flex-direction:column;
 }
+.floatingChatHeader { display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid rgba(255,255,255,0.02); }
+.floatingChatBody { flex:1; overflow:auto; padding:8px; }
+.dragHandle { cursor:move; }
+.hidden { display:none !important; }
 </style>
 </head>
 <body>
@@ -132,8 +139,10 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
       <button class="btn ghost" id="saveChannelBtn">+ Save</button>
     </div>
     <div class="videoWrap">
-      <div class="videoFrame" id="videoFrame">
-        <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
+      <div class="videoFrame">
+        <div class="videoFrameInner">
+          <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
+        </div>
       </div>
       <div class="statsRow" id="statsRow">
         <div class="stat">
@@ -178,15 +187,19 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
       <div style="display:flex;gap:8px;align-items:center;">
         <label style="font-size:13px;color:var(--muted);">Theme</label>
         <button id="themeToggle" class="btn ghost">🌙</button>
-        <button id="pipChatBtn" class="btn ghost">🗔 Chat PIP</button>
+        <!-- PiP Button added here next to Theme -->
+        <button id="pipToggle" title="Toggle Chat Picture-in-Picture" class="pipBtn">📺</button>
+        <span id="recordIndicator" class="recordBadge hidden">REC</span>
       </div>
     </div>
     <div id="chatWrapper" style="position:relative;">
+      <!-- Keep original iframe for user view; our canvas-based video uses fetched messages -->
       <iframe id="liveChat" class="chatFrame" src=""></iframe>
     </div>
     <div id="recPanel" style="margin-top:10px;">
       <div style="font-weight:700;margin-bottom:6px;">Recommended Live Streams</div>
       <div id="recList" class="recList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <div id="recordedVideos" style="margin-top:10px;"></div>
     </div>
   </div>
 </div>
@@ -195,19 +208,22 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
 <footer>Note: API key and client id are used client-side. For production move requests to a backend.</footer>
 </div>
 
-<!-- PICTURE IN PICTURE CHAT PANEL -->
-<div id="chatPIP">
-  <div style="display:flex;justify-content:space-between;align-items:center;
-              background:rgba(0,0,0,0.25);padding:8px;color:white;font-size:14px;">
-    <span>Live Chat (PIP)</span>
-    <button id="closePIP" style="background:none;border:0;color:white;font-size:16px;cursor:pointer;">✕</button>
-  </div>
-  <iframe id="pipChatFrame" style="width:100%;height:100%;border:0;"></iframe>
-</div>
+<!-- Hidden video that plays the canvas stream and is used for PiP + recording -->
+<video id="chatCanvasVideo" class="hidden" playsinline muted></video>
 
 <script>
+/*
+  Full script with:
+   - chat canvas rendering
+   - canvas -> captureStream -> MediaRecorder
+   - PiP toggle using video.requestPictureInPicture()
+   - automatic recording while viewing a stream
+   - recorded video blob preview + download link
+*/
+
+/* ------------- CONFIG / STATE ------------- */
 const CLIENT_ID = "901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com";
-const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
+const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40"; // keep secure in production
 let LIVE_ID = "";
 let statsCache = { views:0, watching:0, likes:0, startTime:null };
 let chatTimestamps = [];
@@ -217,6 +233,17 @@ let videoStatsInterval = null;
 let uiUpdateInterval = null;
 let signedInUser = null;
 let userChatCount = 0;
+let totalChatsCount = 0;
+
+// Chat -> canvas/recording state
+let chatMessages = []; // array of {text, author, time}
+let canvas = null;
+let ctx = null;
+let canvasStream = null;
+let mediaRecorder = null;
+let recorderChunks = [];
+let isRecording = false;
+let chatCanvasVideo = document.getElementById('chatCanvasVideo');
 
 const liveVideo = document.getElementById('liveVideo');
 const liveChat = document.getElementById('liveChat');
@@ -230,8 +257,11 @@ const durationEl = document.getElementById('duration');
 const likesEl = document.getElementById('likes');
 const chatRateEl = document.getElementById('chatRate');
 const totalChatsEl = document.getElementById('totalChats');
-
-/* ===== Parse Live ID ===== */
+const recListEl = document.getElementById('recList');
+const recPanel = document.getElementById('recPanel');
+const pipToggle = document.getElementById('pipToggle');
+const recordIndicator = document.getElementById('recordIndicator');
+const recordedVideosEl = document.getElementById('recordedVideos');
 
 function parseLiveId(input){
   if(!input) return "";
@@ -245,18 +275,15 @@ function parseLiveId(input){
     return parts.pop() || parts.pop();
   }catch(e){ return input; }
 }
-
 function formatTime(seconds){
   const h = String(Math.floor(seconds/3600)).padStart(2,'0');
   const m = String(Math.floor((seconds%3600)/60)).padStart(2,'0');
   const s = String(seconds%60).padStart(2,'0');
   return `${h}:${m}:${s}`;
 }
-
 function saveToLocal(key,value){ localStorage.setItem(key, JSON.stringify(value)); }
 function loadFromLocal(key,fallback=null){ try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; } }
 function loadSavedChannels(){ populateChannelSelect(loadFromLocal('yt_saved_channels', [])); }
-
 function populateChannelSelect(list){
   channelSelect.innerHTML = '<option value="">— Choose saved channel —</option>';
   list.forEach(item=>{
@@ -266,7 +293,6 @@ function populateChannelSelect(list){
     channelSelect.appendChild(opt);
   });
 }
-
 function addSavedChannel(id,title){
   if(!id) return;
   const list = loadFromLocal('yt_saved_channels', []);
@@ -275,18 +301,15 @@ function addSavedChannel(id,title){
   saveToLocal('yt_saved_channels',list);
   populateChannelSelect(list);
 }
-
 channelSelect.addEventListener('change', ()=>{
   const val = channelSelect.value;
   if(val){ liveIdInput.value = val; startViewing(val); }
 });
-
 loadBtn.addEventListener('click', ()=>{
   const id = parseLiveId(liveIdInput.value);
   if(!id) return alert('Enter a live ID or paste a YouTube URL.');
   startViewing(id);
 });
-
 saveChannelBtn.addEventListener('click', async ()=>{
   if(!LIVE_ID) return alert('Load a live first.');
   try{
@@ -301,45 +324,174 @@ saveChannelBtn.addEventListener('click', async ()=>{
   }
 });
 
-/* ===== START VIEWING ===== */
+/* ------------- Canvas setup for chat rendering ------------- */
+function ensureCanvas(){
+  if(canvas) return;
+  // choose a portrait canvas resembling a chat column
+  canvas = document.createElement('canvas');
+  canvas.width = 480; // width of PiP video
+  canvas.height = 720; // height of PiP video
+  ctx = canvas.getContext('2d', { alpha: false });
+  // style: dark chat background
+  ctx.fillStyle = '#071017';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Start the stream and attach to hidden video
+  canvasStream = canvas.captureStream(30);
+  chatCanvasVideo.srcObject = canvasStream;
+  chatCanvasVideo.muted = true;
+  chatCanvasVideo.playsInline = true;
+}
 
+/* draw the latest messages onto the canvas */
+function renderChatToCanvas(){
+  if(!canvas || !ctx) return;
+  // background
+  ctx.fillStyle = '#071017';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // header
+  ctx.fillStyle = '#0b1220';
+  ctx.fillRect(0,0,canvas.width,56);
+  ctx.fillStyle = '#fff';
+  ctx.font = '700 20px Inter, Arial';
+  ctx.fillText('Live Chat', 12, 36);
+
+  // draw messages from bottom up
+  const padding = 12;
+  const lineHeight = 20;
+  const maxLines = Math.floor((canvas.height - 56 - padding) / lineHeight) - 1;
+  // build lines (author: text)
+  const lines = [];
+  // show newest messages at bottom
+  for(let i = chatMessages.length - 1; i >= 0 && lines.length < maxLines; i--){
+    const m = chatMessages[i];
+    // Build text: "Author: message"
+    const author = m.author ? (m.author.length>20 ? m.author.slice(0,18)+'…' : m.author) : 'anon';
+    const text = `${author}: ${m.text}`;
+    // wrap text into segments if too long
+    const maxChars = 40;
+    if(text.length <= maxChars){
+      lines.push(text);
+    } else {
+      // split into chunks
+      for(let j=0;j<Math.ceil(text.length/maxChars);j++){
+        const seg = text.slice(j*maxChars, (j+1)*maxChars);
+        lines.push(seg);
+        if(lines.length >= maxLines) break;
+      }
+    }
+  }
+
+  // draw lines
+  ctx.font = '400 16px Inter, Arial';
+  ctx.fillStyle = '#e6f0ff';
+  const startY = canvas.height - padding - 4;
+  for(let i=0;i<lines.length;i++){
+    const y = startY - (i * lineHeight);
+    // fade older lines
+    const alpha = 1 - (i / (lines.length+2));
+    ctx.globalAlpha = Math.max(0.22, alpha);
+    ctx.fillText(lines[i], padding, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ------------- MediaRecorder control ------------- */
+function startRecording(){
+  ensureCanvas();
+  if(isRecording) return;
+  recorderChunks = [];
+  try{
+    const options = { mimeType: 'video/webm;codecs=vp9' };
+    mediaRecorder = new MediaRecorder(canvasStream, options);
+  }catch(e){
+    try{ mediaRecorder = new MediaRecorder(canvasStream); }catch(e2){ console.error('MediaRecorder not available', e2); return; }
+  }
+  mediaRecorder.ondataavailable = (ev)=> { if(ev.data && ev.data.size>0) recorderChunks.push(ev.data); };
+  mediaRecorder.onstop = handleRecordingStop;
+  mediaRecorder.start(1000); // gather blobs every second
+  isRecording = true;
+  recordIndicator.classList.remove('hidden');
+  // attempt to play hidden video (required by some browsers for PiP)
+  chatCanvasVideo.play().catch(()=>{ /* autoplay may be blocked until user interacts */ });
+  console.log('Recording started');
+}
+function stopRecording(){
+  if(!isRecording) return;
+  try{ mediaRecorder.stop(); }catch(e){ console.warn(e); }
+  isRecording = false;
+  recordIndicator.classList.add('hidden');
+  console.log('Recording stopped — finalizing');
+}
+function handleRecordingStop(){
+  if(recorderChunks.length === 0) return;
+  const blob = new Blob(recorderChunks, { type: 'video/webm' });
+  const url = URL.createObjectURL(blob);
+  // create preview + download
+  const wrapper = document.createElement('div');
+  wrapper.style.marginTop = '8px';
+  const title = document.createElement('div');
+  title.textContent = `Recorded chat — ${new Date().toLocaleString()}`;
+  title.style.fontWeight = '600';
+  title.style.marginBottom = '6px';
+  const vid = document.createElement('video');
+  vid.controls = true;
+  vid.src = url;
+  vid.style.maxWidth = '100%';
+  vid.style.borderRadius = '8px';
+  const dl = document.createElement('a');
+  dl.href = url;
+  dl.download = `chat-recording-${Date.now()}.webm`;
+  dl.textContent = 'Download';
+  dl.style.display = 'inline-block';
+  dl.style.marginTop = '6px';
+  dl.style.fontWeight = '700';
+  dl.style.color = 'var(--accent)';
+  wrapper.appendChild(title);
+  wrapper.appendChild(vid);
+  wrapper.appendChild(dl);
+  recordedVideosEl.prepend(wrapper);
+  // clear recorded chunks
+  recorderChunks = [];
+}
+
+/* ------------- Chat fetching + integration ------------- */
 async function startViewing(newId){
+  // stop current polling/recording
   stopPolling();
+  stopRecording(); // finalize previous recording
   LIVE_ID = newId;
-
-  // Update main video + chat
   liveVideo.src = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
   liveChat.src = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
-
-  // Update PIP chat if open
-  document.getElementById("pipChatFrame").src =
-    `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
-
   chatTimestamps = []; chatPageToken = null;
   statsCache = { views:0, watching:0, likes:0, startTime:null };
   userChatCount = 0;
+  totalChatsCount = 0;
   document.getElementById('userChats').innerText = 'Your chats: 0';
-
+  totalChatsEl.innerText = '0';
+  chatMessages = [];
+  ensureCanvas();
+  renderChatToCanvas();
   const info = await fetchVideoInfo(LIVE_ID);
   if(!info){ alert('Could not load video info.'); return; }
-
   await updateStatsFromVideoInfo(info);
-
   videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
-
   const liveDetails = info.liveStreamingDetails || {};
   const liveChatId = liveDetails.activeLiveChatId || null;
-
-  chatPollingInterval = setInterval(()=>{
-    if(liveChatId) fetchChatMessages(liveChatId);
-  },5000);
-
-  uiUpdateInterval = setInterval(updateStatDisplay,100);
-
+  // poll chat using youtube api
+  if(liveChatId){
+    // initial fetch immediately
+    fetchChatMessages(liveChatId);
+    chatPollingInterval = setInterval(()=>{ if(liveChatId) fetchChatMessages(liveChatId); },5000);
+  } else {
+    // no active live chat
+    console.warn('No activeLiveChatId found for this video.');
+  }
+  uiUpdateInterval = setInterval(()=>{ renderChatToCanvas(); updateStatDisplay(); },100);
   fetchRecommendedLiveStreams(info?.snippet?.title || '');
+  // start recording the canvas stream automatically when viewing
+  startRecording();
 }
-
-/* ===== Fetch Video Info ===== */
 
 async function fetchVideoInfo(videoId){
   const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,liveStreamingDetails&id=${videoId}&key=${API_KEY}`;
@@ -350,7 +502,6 @@ async function fetchVideoInfo(videoId){
     return null;
   }catch(e){ console.error('fetchVideoInfo', e); return null; }
 }
-
 async function updateStatsFromVideoInfo(info){
   const stats = info.statistics || {};
   const live = info.liveStreamingDetails || {};
@@ -359,155 +510,91 @@ async function updateStatsFromVideoInfo(info){
   statsCache.watching = Number(live.concurrentViewers||0);
   statsCache.startTime = live.actualStartTime ? new Date(live.actualStartTime) : null;
 }
-
 async function fetchAndUpdateVideoStats(){
   if(!LIVE_ID) return;
-  try{
-    const info = await fetchVideoInfo(LIVE_ID);
-    if(info) await updateStatsFromVideoInfo(info);
-  }catch(e){ console.error(e); }
+  try{ const info = await fetchVideoInfo(LIVE_ID); if(info) await updateStatsFromVideoInfo(info); }catch(e){ console.error(e); }
 }
-
-/* ===== Chat Polling ===== */
 
 async function fetchChatMessages(liveChatId){
   const base = `https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=${encodeURIComponent(liveChatId)}&key=${API_KEY}&maxResults=200`;
   const url = chatPageToken ? base+'&pageToken='+chatPageToken : base;
-
   try{
     const res = await fetch(url);
     const json = await res.json();
     if(!json) return;
-
     chatPageToken = json.nextPageToken || null;
     const items = json.items || [];
     const now = Date.now();
-
     items.forEach(item=>{
-      const t = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt).getTime() : now;
+      const snippet = item.snippet || {};
+      const author = item.authorDetails?.displayName || 'anon';
+      const messageText = snippet.displayMessage || (snippet.textMessageDetails && snippet.textMessageDetails.messageText) || '';
+      const t = snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : now;
       chatTimestamps.push(t);
-
+      // save message for canvas rendering (push as newest)
+      chatMessages.push({ text: sanitizeText(messageText), author: author, time: t });
+      // cap messages to reasonable size to avoid memory bloat
+      if(chatMessages.length > 1000) chatMessages.splice(0, chatMessages.length - 1000);
       if(signedInUser && item.authorDetails?.displayName === signedInUser){
         userChatCount++;
       }
     });
-
+    // keep only messages from last 60s for chat rate calc
     chatTimestamps = chatTimestamps.filter(ts=>ts>=Date.now()-60000);
-
-    totalChatsEl.innerText = Number(totalChatsEl.innerText || 0) + items.length;
-
-    if(signedInUser)
-      document.getElementById('userChats').innerText = `Your chats: ${userChatCount}`;
-  }
-  catch(e){ console.error(e); }
+    totalChatsCount += items.length;
+    totalChatsEl.innerText = totalChatsCount;
+    if(signedInUser) document.getElementById('userChats').innerText = `Your chats: ${userChatCount}`;
+  }catch(e){ console.error(e); }
 }
 
-function computeChatRate(){
-  return chatTimestamps.filter(ts=>ts>=Date.now()-60000).length;
+function sanitizeText(s){
+  if(!s) return '';
+  // remove control chars
+  return s.replace(/[\x00-\x1F\x7F]/g,'').trim();
 }
 
+function computeChatRate(){ return chatTimestamps.filter(ts=>ts>=Date.now()-60000).length; }
 function updateStatDisplay(){
   viewsEl.innerText = statsCache.views.toLocaleString();
   watchingEl.innerText = statsCache.watching.toLocaleString();
   likesEl.innerText = statsCache.likes.toLocaleString();
-  durationEl.innerText = statsCache.startTime
-    ? formatTime(Math.floor((Date.now()-statsCache.startTime.getTime())/1000))
-    : '--:--:--';
+  durationEl.innerText = statsCache.startTime ? formatTime(Math.floor((Date.now()-statsCache.startTime.getTime())/1000)) : '--:--:--';
   chatRateEl.innerText = computeChatRate() + ' / min';
 }
 
 function stopPolling(){
-  clearInterval(videoStatsInterval);
-  clearInterval(chatPollingInterval);
-  clearInterval(uiUpdateInterval);
+  if(videoStatsInterval){ clearInterval(videoStatsInterval); videoStatsInterval=null; }
+  if(chatPollingInterval){ clearInterval(chatPollingInterval); chatPollingInterval=null; }
+  if(uiUpdateInterval){ clearInterval(uiUpdateInterval); uiUpdateInterval=null; }
 }
 
-/* ===== Recommended Streams ===== */
-
+/* ------------- Recommendations ------------- */
 async function fetchRecommendedLiveStreams(title){
-  if(!title){
-    document.getElementById('recList').innerHTML='<div>No title for recommendations</div>';
-    return;
-  }
-
-  document.getElementById('recList').innerHTML='<div>Loading recommended live streams…</div>';
-
+  if(!title){ recListEl.innerHTML='<div>No title for recommendations</div>'; return; }
+  recListEl.innerHTML='<div>Loading recommended live streams…</div>';
   try{
     const q = encodeURIComponent(title+' live');
-    const url =
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&q=${q}&key=${API_KEY}&maxResults=8`;
-
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&q=${q}&key=${API_KEY}&maxResults=8`;
     const res = await fetch(url);
     const json = await res.json();
-
-    if(!json?.items?.length){
-      document.getElementById('recList').innerHTML='<div>No live recommendations found</div>';
-      return;
-    }
-
-    const recList = document.getElementById('recList');
-    recList.innerHTML='';
-
+    if(!json?.items?.length){ recListEl.innerHTML='<div>No live recommendations found</div>'; return; }
+    recListEl.innerHTML='';
     json.items.forEach(it=>{
-      const vid = it.id.videoId;
-      const snip = it.snippet || {};
-      const thumb = (snip.thumbnails?.medium?.url || snip.thumbnails?.default?.url) || '';
+      const vid=it.id.videoId;
+      const snip=it.snippet||{};
+      const thumb=(snip.thumbnails?.medium?.url || snip.thumbnails?.default?.url) || '';
       const titleText = snip.title || vid;
       const channel = snip.channelTitle || '';
-
       const item = document.createElement('div');
-      item.style.display='flex';
-      item.style.gap='8px';
-      item.style.cursor='pointer';
-
-      item.innerHTML =
-        `<img src="${thumb}" width="84" height="48" style="object-fit:cover;border-radius:6px;" />
-         <div>
-           <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-             ${titleText}
-           </div>
-           <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-             ${channel} • Live
-           </div>
-         </div>`;
-
-      item.addEventListener('click', ()=>{
-        liveIdInput.value = vid;
-        startViewing(vid);
-      });
-
-      recList.appendChild(item);
+      item.style.display='flex'; item.style.gap='8px'; item.style.cursor='pointer';
+      item.innerHTML = `<img src="${thumb}" width="84" height="48" style="object-fit:cover;border-radius:6px;" /><div><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${titleText}</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${channel} • Live</div></div>`;
+      item.addEventListener('click', ()=> { liveIdInput.value=vid; startViewing(vid); });
+      recListEl.appendChild(item);
     });
-  }
-  catch(e){
-    console.error(e);
-    document.getElementById('recList').innerHTML='<div>Error fetching recommendations</div>';
-  }
+  }catch(e){ console.error(e); recListEl.innerHTML='<div>Error fetching recommendations</div>'; }
 }
 
-/* ===== Picture-in-Picture Chat ===== */
-
-const pipBtn = document.getElementById("pipChatBtn");
-const chatPIP = document.getElementById("chatPIP");
-const pipChatFrame = document.getElementById("pipChatFrame");
-const closePIP = document.getElementById("closePIP");
-
-pipBtn.addEventListener("click", () => {
-  if (!LIVE_ID) return alert("Load a live stream first.");
-
-  pipChatFrame.src =
-    `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
-
-  chatPIP.style.display = "block";
-});
-
-closePIP.addEventListener("click", () => {
-  chatPIP.style.display = "none";
-  pipChatFrame.src = "";
-});
-
-/* ===== Google Sign-In ===== */
-
+/* ------------- Google Sign-In callback ------------- */
 function onGoogleSignIn(googleUser){
   const profile = googleUser.getBasicProfile();
   signedInUser = profile.getName();
@@ -517,6 +604,71 @@ function onGoogleSignIn(googleUser){
   document.getElementById('signedInfo').style.display='flex';
   document.getElementById('signinBox').style.display='none';
 }
+
+// Basic theme toggle
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  const root = document.getElementById('appRoot');
+  const cur = root.getAttribute('data-theme') || 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  document.getElementById('themeToggle').textContent = next === 'dark' ? '🌙' : '☀️';
+});
+
+/* ------------- PiP Toggle ------------- */
+pipToggle.addEventListener('click', async ()=>{
+  try{
+    ensureCanvas();
+    // make sure video has source
+    if(!chatCanvasVideo.srcObject){
+      chatCanvasVideo.srcObject = canvasStream;
+    }
+    // play video first (some browsers require it)
+    await chatCanvasVideo.play().catch(()=>{ /* may throw if autoplay blocked */ });
+    // request PiP
+    if(document.pictureInPictureElement){
+      await document.exitPictureInPicture();
+    } else {
+      // ensure video is ready
+      await chatCanvasVideo.requestPictureInPicture();
+    }
+  }catch(err){
+    console.error('PiP error', err);
+    alert('Picture-in-Picture not supported or blocked by your browser.');
+  }
+});
+
+/* ------------- Page unload tidy-up ------------- */
+window.addEventListener('beforeunload', ()=>{
+  stopRecording();
+  stopPolling();
+});
+
+/* ------------- Initialization ------------- */
+loadSavedChannels();
+// expose Google sign-in function globally for the gsi callback to call
+window.onGoogleSignIn = onGoogleSignIn;
+
+/* Optional: add a button to stop recording manually (not required but useful) */
+(function addRecordingControls(){
+  const ctrl = document.createElement('div');
+  ctrl.style.position = 'fixed';
+  ctrl.style.left = '18px';
+  ctrl.style.bottom = '18px';
+  ctrl.style.zIndex = 99999;
+  ctrl.style.display = 'flex';
+  ctrl.style.gap = '8px';
+  const stopBtn = document.createElement('button');
+  stopBtn.textContent = 'Stop Recording';
+  stopBtn.className = 'btn ghost';
+  stopBtn.addEventListener('click', ()=>{ stopRecording(); });
+  const startBtn = document.createElement('button');
+  startBtn.textContent = 'Start Recording';
+  startBtn.className = 'btn ghost';
+  startBtn.addEventListener('click', ()=>{ startRecording(); });
+  ctrl.appendChild(stopBtn);
+  ctrl.appendChild(startBtn);
+  document.body.appendChild(ctrl);
+})();
 </script>
 </body>
 </html>
