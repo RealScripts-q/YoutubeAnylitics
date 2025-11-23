@@ -69,8 +69,24 @@ select, input[type=text]{ background:transparent;border:1px solid var(--glass-bo
 @media (max-width:1000px){ main{ flex-direction:column; } .videoFrame iframe, .chatFrame { height:420px; } .stat .value{ font-size:16px; } }
 @media (max-width:520px){ .videoFrame iframe, .chatFrame { height:320px; } header{ flex-direction:column; align-items:flex-start; gap:10px; } .controls { width:100%; justify-content:space-between; } }
 footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center; }
-</style>
 
+/* === PICTURE-IN-PICTURE CHAT WINDOW === */
+#chatPIP {
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  width:350px;
+  height:500px;
+  background:var(--card);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  backdrop-filter: blur(10px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.45);
+  display:none;
+  z-index:999999;
+  overflow:hidden;
+}
+</style>
 </head>
 <body>
 <div class="app" id="appRoot" data-theme="dark">
@@ -82,8 +98,6 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
     <p class="subtitle">Live video left • chat right • saved sign-in • nice UI</p>
   </div>
 </div>
-
-<!-- Controls -->
 <div class="controls">
   <div class="small" id="signinBox">
     <div id="g_id_onload"
@@ -93,7 +107,6 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
          data-auto_prompt="false"></div>
     <div class="g_id_signin" data-type="standard"></div>
   </div>
-
   <div class="small" id="signedInfo" style="display:none;">
     <div class="profile">
       <div class="avatar" id="userAvatar"><img alt="user" src="" /></div>
@@ -118,19 +131,41 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
       <button class="btn" id="loadBtn">Load</button>
       <button class="btn ghost" id="saveChannelBtn">+ Save</button>
     </div>
-
     <div class="videoWrap">
       <div class="videoFrame" id="videoFrame">
         <iframe id="liveVideo" allow="autoplay; encrypted-media" src=""></iframe>
       </div>
-
       <div class="statsRow" id="statsRow">
-        <div class="stat"><div class="label">Views</div><div class="value" id="views">0</div><div class="smallNote">Total video views</div></div>
-        <div class="stat"><div class="label">Watching Now</div><div class="value" id="watching">0</div><div class="smallNote">Concurrent viewers</div></div>
-        <div class="stat"><div class="label">Live For</div><div class="value" id="duration">--:--:--</div><div class="smallNote">Time since start</div></div>
-        <div class="stat"><div class="label">Likes</div><div class="value" id="likes">0</div><div class="smallNote">Total likes</div></div>
-        <div class="stat"><div class="label">Chat Rate</div><div class="value" id="chatRate">0 / min</div><div class="smallNote">Messages per minute</div></div>
-        <div class="stat"><div class="label">Total Chats</div><div class="value" id="totalChats">0</div><div class="smallNote" id="userChats">Your chats: 0</div></div>
+        <div class="stat">
+          <div class="label">Views</div>
+          <div class="value" id="views">0</div>
+          <div class="smallNote">Total video views</div>
+        </div>
+        <div class="stat">
+          <div class="label">Watching Now</div>
+          <div class="value" id="watching">0</div>
+          <div class="smallNote">Concurrent viewers</div>
+        </div>
+        <div class="stat">
+          <div class="label">Live For</div>
+          <div class="value" id="duration">--:--:--</div>
+          <div class="smallNote">Time since start</div>
+        </div>
+        <div class="stat">
+          <div class="label">Likes</div>
+          <div class="value" id="likes">0</div>
+          <div class="smallNote">Total likes</div>
+        </div>
+        <div class="stat">
+          <div class="label">Chat Rate</div>
+          <div class="value" id="chatRate">0 / min</div>
+          <div class="smallNote">Messages per minute</div>
+        </div>
+        <div class="stat">
+          <div class="label">Total Chats</div>
+          <div class="value" id="totalChats">0</div>
+          <div class="smallNote" id="userChats">Your chats: 0</div>
+        </div>
       </div>
     </div>
   </div>
@@ -140,19 +175,15 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
   <div class="card" style="display:flex;flex-direction:column;height:100%;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div style="font-weight:700;">Live Chat</div>
-
-      <!-- Theme + PiP Buttons -->
       <div style="display:flex;gap:8px;align-items:center;">
         <label style="font-size:13px;color:var(--muted);">Theme</label>
         <button id="themeToggle" class="btn ghost">🌙</button>
-        <button id="pipBtn" class="btn ghost" title="Picture in Picture">📺</button>
+        <button id="pipChatBtn" class="btn ghost">🗔 Chat PIP</button>
       </div>
     </div>
-
     <div id="chatWrapper" style="position:relative;">
       <iframe id="liveChat" class="chatFrame" src=""></iframe>
     </div>
-
     <div id="recPanel" style="margin-top:10px;">
       <div style="font-weight:700;margin-bottom:6px;">Recommended Live Streams</div>
       <div id="recList" class="recList" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -164,14 +195,19 @@ footer { margin-top:18px; color:var(--muted); font-size:12px; text-align:center;
 <footer>Note: API key and client id are used client-side. For production move requests to a backend.</footer>
 </div>
 
-<script>
-/* ------------------------ */
-/* EXISTING SCRIPT UNCHANGED */
-/* ------------------------ */
+<!-- PICTURE IN PICTURE CHAT PANEL -->
+<div id="chatPIP">
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              background:rgba(0,0,0,0.25);padding:8px;color:white;font-size:14px;">
+    <span>Live Chat (PIP)</span>
+    <button id="closePIP" style="background:none;border:0;color:white;font-size:16px;cursor:pointer;">✕</button>
+  </div>
+  <iframe id="pipChatFrame" style="width:100%;height:100%;border:0;"></iframe>
+</div>
 
+<script>
 const CLIENT_ID = "901141733729-usvhkcmlf33ndqam6cvnlr35dqep84c6.apps.googleusercontent.com";
 const API_KEY = "AIzaSyCT0iOHCTHWYrLBSs2A-Th_jQK85pWsg40";
-
 let LIVE_ID = "";
 let statsCache = { views:0, watching:0, likes:0, startTime:null };
 let chatTimestamps = [];
@@ -195,7 +231,7 @@ const likesEl = document.getElementById('likes');
 const chatRateEl = document.getElementById('chatRate');
 const totalChatsEl = document.getElementById('totalChats');
 
-/* Parsing, saving, loading, UI functions — unchanged */
+/* ===== Parse Live ID ===== */
 
 function parseLiveId(input){
   if(!input) return "";
@@ -210,46 +246,268 @@ function parseLiveId(input){
   }catch(e){ return input; }
 }
 
-/* Many functions cut here for brevity — all unchanged — keeping your full logic */
+function formatTime(seconds){
+  const h = String(Math.floor(seconds/3600)).padStart(2,'0');
+  const m = String(Math.floor((seconds%3600)/60)).padStart(2,'0');
+  const s = String(seconds%60).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+function saveToLocal(key,value){ localStorage.setItem(key, JSON.stringify(value)); }
+function loadFromLocal(key,fallback=null){ try{ const v = JSON.parse(localStorage.getItem(key)); return v===null?fallback:v; }catch(e){ return fallback; } }
+function loadSavedChannels(){ populateChannelSelect(loadFromLocal('yt_saved_channels', [])); }
+
+function populateChannelSelect(list){
+  channelSelect.innerHTML = '<option value="">— Choose saved channel —</option>';
+  list.forEach(item=>{
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = `${item.title || item.id} — ${item.id}`;
+    channelSelect.appendChild(opt);
+  });
+}
+
+function addSavedChannel(id,title){
+  if(!id) return;
+  const list = loadFromLocal('yt_saved_channels', []);
+  if(list.find(x=>x.id===id)) return alert('Channel already saved');
+  list.push({id,title:title||id});
+  saveToLocal('yt_saved_channels',list);
+  populateChannelSelect(list);
+}
+
+channelSelect.addEventListener('change', ()=>{
+  const val = channelSelect.value;
+  if(val){ liveIdInput.value = val; startViewing(val); }
+});
+
+loadBtn.addEventListener('click', ()=>{
+  const id = parseLiveId(liveIdInput.value);
+  if(!id) return alert('Enter a live ID or paste a YouTube URL.');
+  startViewing(id);
+});
+
+saveChannelBtn.addEventListener('click', async ()=>{
+  if(!LIVE_ID) return alert('Load a live first.');
+  try{
+    const info = await fetchVideoInfo(LIVE_ID);
+    const title = (info?.snippet?.title) || LIVE_ID;
+    addSavedChannel(LIVE_ID,title);
+    alert('Saved channel: ' + title);
+  }catch(e){
+    console.warn(e);
+    addSavedChannel(LIVE_ID,LIVE_ID);
+    alert('Saved id: ' + LIVE_ID);
+  }
+});
+
+/* ===== START VIEWING ===== */
 
 async function startViewing(newId){
   stopPolling();
   LIVE_ID = newId;
+
+  // Update main video + chat
   liveVideo.src = `https://www.youtube.com/embed/${LIVE_ID}?autoplay=1`;
   liveChat.src = `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
-  
-  /* (rest unchanged) */
+
+  // Update PIP chat if open
+  document.getElementById("pipChatFrame").src =
+    `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
+
+  chatTimestamps = []; chatPageToken = null;
+  statsCache = { views:0, watching:0, likes:0, startTime:null };
+  userChatCount = 0;
+  document.getElementById('userChats').innerText = 'Your chats: 0';
+
+  const info = await fetchVideoInfo(LIVE_ID);
+  if(!info){ alert('Could not load video info.'); return; }
+
+  await updateStatsFromVideoInfo(info);
+
+  videoStatsInterval = setInterval(fetchAndUpdateVideoStats,15000);
+
+  const liveDetails = info.liveStreamingDetails || {};
+  const liveChatId = liveDetails.activeLiveChatId || null;
+
+  chatPollingInterval = setInterval(()=>{
+    if(liveChatId) fetchChatMessages(liveChatId);
+  },5000);
+
+  uiUpdateInterval = setInterval(updateStatDisplay,100);
+
+  fetchRecommendedLiveStreams(info?.snippet?.title || '');
 }
 
-/* ---------------------------- */
-/* ADD: PICTURE IN PICTURE CODE */
-/* ---------------------------- */
+/* ===== Fetch Video Info ===== */
 
-const pipBtn = document.getElementById('pipBtn');
+async function fetchVideoInfo(videoId){
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,liveStreamingDetails&id=${videoId}&key=${API_KEY}`;
+  try{
+    const res = await fetch(url);
+    const json = await res.json();
+    if(json.items?.length>0) return json.items[0];
+    return null;
+  }catch(e){ console.error('fetchVideoInfo', e); return null; }
+}
 
-pipBtn.addEventListener('click', async () => {
-  const iframe = document.querySelector("#liveVideo");
+async function updateStatsFromVideoInfo(info){
+  const stats = info.statistics || {};
+  const live = info.liveStreamingDetails || {};
+  statsCache.views = Number(stats.viewCount||0);
+  statsCache.likes = Number(stats.likeCount||0);
+  statsCache.watching = Number(live.concurrentViewers||0);
+  statsCache.startTime = live.actualStartTime ? new Date(live.actualStartTime) : null;
+}
 
-  try {
-    const video = iframe.contentDocument?.querySelector("video");
+async function fetchAndUpdateVideoStats(){
+  if(!LIVE_ID) return;
+  try{
+    const info = await fetchVideoInfo(LIVE_ID);
+    if(info) await updateStatsFromVideoInfo(info);
+  }catch(e){ console.error(e); }
+}
 
-    if (!video) {
-      alert("PiP only works after the video finishes loading.");
+/* ===== Chat Polling ===== */
+
+async function fetchChatMessages(liveChatId){
+  const base = `https://www.googleapis.com/youtube/v3/liveChat/messages?part=snippet,authorDetails&liveChatId=${encodeURIComponent(liveChatId)}&key=${API_KEY}&maxResults=200`;
+  const url = chatPageToken ? base+'&pageToken='+chatPageToken : base;
+
+  try{
+    const res = await fetch(url);
+    const json = await res.json();
+    if(!json) return;
+
+    chatPageToken = json.nextPageToken || null;
+    const items = json.items || [];
+    const now = Date.now();
+
+    items.forEach(item=>{
+      const t = item.snippet?.publishedAt ? new Date(item.snippet.publishedAt).getTime() : now;
+      chatTimestamps.push(t);
+
+      if(signedInUser && item.authorDetails?.displayName === signedInUser){
+        userChatCount++;
+      }
+    });
+
+    chatTimestamps = chatTimestamps.filter(ts=>ts>=Date.now()-60000);
+
+    totalChatsEl.innerText = Number(totalChatsEl.innerText || 0) + items.length;
+
+    if(signedInUser)
+      document.getElementById('userChats').innerText = `Your chats: ${userChatCount}`;
+  }
+  catch(e){ console.error(e); }
+}
+
+function computeChatRate(){
+  return chatTimestamps.filter(ts=>ts>=Date.now()-60000).length;
+}
+
+function updateStatDisplay(){
+  viewsEl.innerText = statsCache.views.toLocaleString();
+  watchingEl.innerText = statsCache.watching.toLocaleString();
+  likesEl.innerText = statsCache.likes.toLocaleString();
+  durationEl.innerText = statsCache.startTime
+    ? formatTime(Math.floor((Date.now()-statsCache.startTime.getTime())/1000))
+    : '--:--:--';
+  chatRateEl.innerText = computeChatRate() + ' / min';
+}
+
+function stopPolling(){
+  clearInterval(videoStatsInterval);
+  clearInterval(chatPollingInterval);
+  clearInterval(uiUpdateInterval);
+}
+
+/* ===== Recommended Streams ===== */
+
+async function fetchRecommendedLiveStreams(title){
+  if(!title){
+    document.getElementById('recList').innerHTML='<div>No title for recommendations</div>';
+    return;
+  }
+
+  document.getElementById('recList').innerHTML='<div>Loading recommended live streams…</div>';
+
+  try{
+    const q = encodeURIComponent(title+' live');
+    const url =
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&eventType=live&q=${q}&key=${API_KEY}&maxResults=8`;
+
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if(!json?.items?.length){
+      document.getElementById('recList').innerHTML='<div>No live recommendations found</div>';
       return;
     }
 
-    if (document.pictureInPictureElement) {
-      await document.exitPictureInPicture();
-    } else {
-      await video.requestPictureInPicture();
-    }
-  } catch (err) {
-    console.error(err);
-    alert("Your browser does not allow PiP from YouTube embeds.");
+    const recList = document.getElementById('recList');
+    recList.innerHTML='';
+
+    json.items.forEach(it=>{
+      const vid = it.id.videoId;
+      const snip = it.snippet || {};
+      const thumb = (snip.thumbnails?.medium?.url || snip.thumbnails?.default?.url) || '';
+      const titleText = snip.title || vid;
+      const channel = snip.channelTitle || '';
+
+      const item = document.createElement('div');
+      item.style.display='flex';
+      item.style.gap='8px';
+      item.style.cursor='pointer';
+
+      item.innerHTML =
+        `<img src="${thumb}" width="84" height="48" style="object-fit:cover;border-radius:6px;" />
+         <div>
+           <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+             ${titleText}
+           </div>
+           <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+             ${channel} • Live
+           </div>
+         </div>`;
+
+      item.addEventListener('click', ()=>{
+        liveIdInput.value = vid;
+        startViewing(vid);
+      });
+
+      recList.appendChild(item);
+    });
   }
+  catch(e){
+    console.error(e);
+    document.getElementById('recList').innerHTML='<div>Error fetching recommendations</div>';
+  }
+}
+
+/* ===== Picture-in-Picture Chat ===== */
+
+const pipBtn = document.getElementById("pipChatBtn");
+const chatPIP = document.getElementById("chatPIP");
+const pipChatFrame = document.getElementById("pipChatFrame");
+const closePIP = document.getElementById("closePIP");
+
+pipBtn.addEventListener("click", () => {
+  if (!LIVE_ID) return alert("Load a live stream first.");
+
+  pipChatFrame.src =
+    `https://www.youtube.com/live_chat?v=${LIVE_ID}&embed_domain=${location.hostname}`;
+
+  chatPIP.style.display = "block";
 });
 
-/* Google sign-in — unchanged */
+closePIP.addEventListener("click", () => {
+  chatPIP.style.display = "none";
+  pipChatFrame.src = "";
+});
+
+/* ===== Google Sign-In ===== */
+
 function onGoogleSignIn(googleUser){
   const profile = googleUser.getBasicProfile();
   signedInUser = profile.getName();
@@ -259,7 +517,6 @@ function onGoogleSignIn(googleUser){
   document.getElementById('signedInfo').style.display='flex';
   document.getElementById('signinBox').style.display='none';
 }
-
 </script>
 </body>
 </html>
